@@ -36,10 +36,19 @@ public class Isql extends HttpServlet {
         PrintWriter out = response.getWriter();
         
         //print the HTML header </font>
+        StringBuffer head = new StringBuffer();
+        head.append("<head>")
+        	.append("<title>Isql Tester</title>")
+        	.append("<link rel=\"stylesheet\" type=\"text/css\" href=\"" + request.getContextPath() + "/css/styles.css\" />")
+        	.append("<link rel=\"stylesheet\" type=\"text/css\" href=\"" + request.getContextPath() + "/plugins/datatables/css/jquery.dataTables.css\" />")
+        	.append("<link rel=\"stylesheet\" type=\"text/css\" href=\"" + request.getContextPath() + "/plugins/scroller/css/dataTables.scroller.css\" />")
+        	.append("<link rel=\"stylesheet\" type=\"text/css\" href=\"" + request.getContextPath() + "/plugins/tabletools/css/TableTools.css\" />")
+        	.append("<script src=\"http://code.jquery.com/jquery-1.9.1.min.js\"></script>")
+        	.append("<script src=\"http://code.jquery.com/jquery-migrate-1.1.1.min.js\"></script>")
+        	.append("</head>")
+        	;
         out.println("<html>");
-        out.println("<head>");
-        out.println("<title>Isql Tester</title>");
-        out.println("</head>");
+        out.println(head.toString());
         out.println("<body bgcolor=\"white\">");
         
         MyEnvironment env = MyEnvironment.getEnvironment();
@@ -349,7 +358,7 @@ public class Isql extends HttpServlet {
                             } else {
                                 if (reqSql.startsWith("tabledef")) {
 	                                String tableName = reqSql.substring(9);
-	                                out.println("<table width=\"100%\"><tr><td width=\"100%\">");
+	                                out.println("<table class=\"datatable\" width=\"100%\"><tr><td width=\"100%\">");
 	                                out.println("Table Definition for '" + tableName + "'");
 	                                out.println("<pre>" + ((DBConnection)conn).getTableDef(null, tableName) + "</pre>");
 	                                out.println("</td></tr></table>");
@@ -357,7 +366,7 @@ public class Isql extends HttpServlet {
 	                                String tableName = reqSql.substring(10);
 	                                org.mattyo161.commons.util.DataMap fieldInfo = ((DBConnection)conn).getFieldDataMap("citest", tableName);
 	                                Set keys = fieldInfo.getKeys();
-	                                out.println("<table width=\"100%\"><tr><td width=\"100%\">");
+	                                out.println("<table class=\"datatable\" width=\"100%\"><tr><td width=\"100%\">");
 	                                out.println("Field Definition for '" + tableName + "'");
 	                                out.println("<pre>" + fieldInfo + "</pre>");
 	                                out.println("</td></tr></table>");
@@ -460,7 +469,24 @@ public class Isql extends HttpServlet {
                 }
             }
        
-
+        StringBuffer dataTables = new StringBuffer();
+        dataTables
+        	.append("<script type=\"text/javascript\" src=\"" + request.getContextPath() + "/plugins/datatables/js/jquery.dataTables.min.js\"></script>")
+	        .append("<script type=\"text/javascript\" src=\"" + request.getContextPath() + "/plugins/tabletools/js/ZeroClipboard.js\"></script>")
+	        .append("<script type=\"text/javascript\" src=\"" + request.getContextPath() + "/plugins/tabletools/js/TableTools.js\"></script>")
+	        .append("<script type=\"text/javascript\" src=\"" + request.getContextPath() + "/plugins/scroller/js/dataTables.scroller.js\"></script>")
+	     	.append("<script type=\"text/javascript\" charset=\"utf-8\">\n")
+	     	.append("$(document).ready(function() {\n")
+	     		.append("$('.datatable').dataTable( {\n")
+		     		.append("\"oTableTools\": {\n")
+		     			.append("\"sSwfPath\": \"" + request.getContextPath() + "/plugins/tabletools/swf/copy_csv_xls_pdf.swf\",\n")
+		     		.append("}\n")
+		     	.append("} );")
+	     	.append("} );\n")
+	     	.append("</script>\n")
+     	;
+         
+        out.println(dataTables.toString());
         out.println("</body>");
         out.println("</html>");
         
@@ -483,15 +509,15 @@ public class Isql extends HttpServlet {
         ResultSetMetaData rsmd = null;
         try {
             rsmd = rs.getMetaData();
-            out.println("<table border=\"1\">");
+            out.println("<table class=\"datatable\" border=\"1\">");
             int currRow = 0;
             int numCols = rsmd.getColumnCount();
-            out.print("<tr>");
+            out.print("<thead><tr>");
             out.print("<th>Row#</th>");
             for (int currCol = 1; currCol <= numCols; currCol++) {
                 out.print("<th>" + rsmd.getColumnName(currCol) + "</th>");
             }
-            out.println("</tr>");
+            out.println("</tr></thead><tbody>");
             String currValue = null;
             while (rs.next() && currRow++ < maxRows)
             {
@@ -513,7 +539,7 @@ public class Isql extends HttpServlet {
                 }
                 out.println("</tr>");
             }
-            out.println("</table>");
+            out.println("</tbody></table>");
         } catch (Exception e) {
             out.println(e.toString());
             System.out.println("ERROR: in printResultSet");
