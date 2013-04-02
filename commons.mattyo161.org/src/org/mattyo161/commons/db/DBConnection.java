@@ -722,29 +722,4 @@ public class DBConnection implements Connection {
 		myConn.setTypeMap(map);
 	}
 
-	@Override
-	public void setSchema(String schema) throws SQLException {
-		myConn.setSchema(schema);
-	}
-
-	@Override
-	public String getSchema() throws SQLException {
-		return myConn.getSchema();
-	}
-
-	@Override
-	public void abort(Executor executor) throws SQLException {
-		myConn.abort(executor);
-	}
-
-	@Override
-	public void setNetworkTimeout(Executor executor, int milliseconds)
-			throws SQLException {
-		myConn.setNetworkTimeout(executor, milliseconds);
-	}
-
-	@Override
-	public int getNetworkTimeout() throws SQLException {
-		return 0;
-	}
 }

@@ -900,14 +900,4 @@ public class DBSyncResultSet implements ResultSet {
 		return rs.getObject(columnLabel,map);
 	}
 
-	@Override
-	public <T> T getObject(int columnIndex, Class<T> type) throws SQLException {
-		return rs.getObject(columnIndex, type);
-	}
-
-	@Override
-	public <T> T getObject(String columnLabel, Class<T> type) throws SQLException {
-		return rs.getObject(columnLabel, type);
-	}
-
 }
