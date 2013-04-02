@@ -9,6 +9,7 @@ package org.mattyo161.commons.db;
 import java.sql.*;
 import java.lang.*;
 import java.util.*;
+import java.util.concurrent.Executor;
 
 import org.mattyo161.commons.db.schema.Index;
 import org.mattyo161.commons.db.schema.IndexColumn;
@@ -559,10 +560,6 @@ public class DBConnection implements Connection {
 		myConn.setTransactionIsolation(param);
 	}
 
-	public void setTypeMap(java.util.Map map) throws java.sql.SQLException {
-		myConn.setTypeMap(map);
-	}
-
 	public static void printResultSet(ResultSet rs, int maxRows) {
 		ResultSetMetaData rsmd = null;
 		try {
@@ -664,70 +661,90 @@ public class DBConnection implements Connection {
 
 	public Array createArrayOf(String typeName, Object[] elements)
 			throws SQLException {
-		// TODO Auto-generated method stub
 		return myConn.createArrayOf(typeName, elements);
 	}
 
 	public Blob createBlob() throws SQLException {
-		// TODO Auto-generated method stub
 		return myConn.createBlob();
 	}
 
 	public Clob createClob() throws SQLException {
-		// TODO Auto-generated method stub
 		return myConn.createClob();
 	}
 
 	public NClob createNClob() throws SQLException {
-		// TODO Auto-generated method stub
 		return myConn.createNClob();
 	}
 
 	public SQLXML createSQLXML() throws SQLException {
-		// TODO Auto-generated method stub
 		return myConn.createSQLXML();
 	}
 
 	public Struct createStruct(String typeName, Object[] attributes)
 			throws SQLException {
-		// TODO Auto-generated method stub
 		return myConn.createStruct(typeName, attributes);
 	}
 
 	public Properties getClientInfo() throws SQLException {
-		// TODO Auto-generated method stub
 		return myConn.getClientInfo();
 	}
 
 	public String getClientInfo(String name) throws SQLException {
-		// TODO Auto-generated method stub
 		return myConn.getClientInfo(name);
 	}
 
 	public boolean isValid(int timeout) throws SQLException {
-		// TODO Auto-generated method stub
 		return myConn.isValid(timeout);
 	}
 
 	public void setClientInfo(Properties properties)
 			throws SQLClientInfoException {
-		// TODO Auto-generated method stub
 		myConn.setClientInfo(properties);
 	}
 
 	public void setClientInfo(String name, String value)
 			throws SQLClientInfoException {
-		// TODO Auto-generated method stub
 		myConn.setClientInfo(name, value);
 	}
 
-	public boolean isWrapperFor(Class arg0) throws SQLException {
-		// TODO Auto-generated method stub
-		return myConn.isWrapperFor(arg0);
+	@Override
+	public <T> T unwrap(Class<T> iface) throws SQLException {
+		return myConn.unwrap(iface);
 	}
 
-	public Object unwrap(Class arg0) throws SQLException {
-		// TODO Auto-generated method stub
-		return myConn.unwrap(arg0);
+	@Override
+	public boolean isWrapperFor(Class<?> iface) throws SQLException {
+		return myConn.isWrapperFor(iface);
+	}
+
+	@Override
+	public void setTypeMap(Map<String, Class<?>> map) throws SQLException {
+		myConn.setTypeMap(map);
+	}
+
+	@Override
+	public void setSchema(String schema) throws SQLException {
+		myConn.setSchema(schema);
+	}
+
+	@Override
+	public String getSchema() throws SQLException {
+		return myConn.getSchema();
+	}
+
+	@Override
+	public void abort(Executor executor) throws SQLException {
+		myConn.abort(executor);
+	}
+
+	@Override
+	public void setNetworkTimeout(Executor executor, int milliseconds)
+			throws SQLException {
+		myConn.setNetworkTimeout(executor, milliseconds);
+	}
+
+	@Override
+	public int getNetworkTimeout() throws SQLException {
+		return 0;
 	}
 }
