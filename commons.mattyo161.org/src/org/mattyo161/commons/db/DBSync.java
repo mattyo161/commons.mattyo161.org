@@ -443,6 +443,15 @@ public class DBSync {
 							}
 						}
 						System.out.println(" (" + successfulUpdates + " Deletes Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
+					} catch (SQLException e) {
+						System.out.println("\nFailure to delete records. " + e.toString());
+						e.printStackTrace();
+						SQLException nextE = e.getNextException();
+						while (nextE != null) {
+							System.out.println(nextE.toString());
+							nextE.printStackTrace();
+							nextE = nextE.getNextException();
+						}
 					} catch (Exception e) {
 						System.out.println("\nFailure to delete records.");
 						e.printStackTrace();
@@ -467,6 +476,15 @@ public class DBSync {
 							}
 						}
 						System.out.println(" (" + successfulUpdates + " Updates Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
+					} catch (SQLException e) {
+						System.out.println("\nFailure to update records. " + e.toString());
+						e.printStackTrace();
+						SQLException nextE = e.getNextException();
+						while (nextE != null) {
+							System.out.println(nextE.toString());
+							nextE.printStackTrace();
+							nextE = nextE.getNextException();
+						}
 					} catch (Exception e) {
 						System.out.println("\nFailure to update records.");
 						e.printStackTrace();
@@ -494,6 +512,15 @@ public class DBSync {
 								}
 							}
 							System.out.println(" (" + successfulUpdates + " Deletes Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
+						} catch (SQLException e) {
+							System.out.println("\nFailure to delete records. " + e.toString());
+							e.printStackTrace();
+							SQLException nextE = e.getNextException();
+							while (nextE != null) {
+								System.out.println(nextE.toString());
+								nextE.printStackTrace();
+								nextE = nextE.getNextException();
+							}
 						} catch (Exception e) {
 							System.out.println("\nFailure to delete records.");
 							e.printStackTrace();
@@ -517,6 +544,15 @@ public class DBSync {
 							}
 						}
 						System.out.println(" (" + successfulUpdates + " Appends Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
+					} catch (SQLException e) {
+						System.out.println("\nFailure to append records. " + e.toString());
+						e.printStackTrace();
+						SQLException nextE = e.getNextException();
+						while (nextE != null) {
+							System.out.println(nextE.toString());
+							nextE.printStackTrace();
+							nextE = nextE.getNextException();
+						}
 					} catch (Exception e) {
 						System.out.println("Failure to append records.");
 						e.printStackTrace();
@@ -548,6 +584,15 @@ public class DBSync {
 						}
 					}
 					System.out.println(" (" + successfulUpdates + " Updates Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
+				} catch (SQLException e) {
+					System.out.println("\nFailure to update records. " + e.toString());
+					e.printStackTrace();
+					SQLException nextE = e.getNextException();
+					while (nextE != null) {
+						System.out.println(nextE.toString());
+						nextE.printStackTrace();
+						nextE = nextE.getNextException();
+					}
 				} catch (Exception e) {
 					System.out.println("\nFailure to update records.");
 					e.printStackTrace();
@@ -572,6 +617,15 @@ public class DBSync {
 						}
 					}
 					System.out.println(" (" + successfulUpdates + " Deletes Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
+				} catch (SQLException e) {
+					System.out.println("\nFailure to delete records. " + e.toString());
+					e.printStackTrace();
+					SQLException nextE = e.getNextException();
+					while (nextE != null) {
+						System.out.println(nextE.toString());
+						nextE.printStackTrace();
+						nextE = nextE.getNextException();
+					}
 				} catch (Exception e) {
 					System.out.println("Failure to delete records.");
 					e.printStackTrace();
@@ -596,6 +650,15 @@ public class DBSync {
 						}
 					}
 					System.out.println(" (" + successfulUpdates + " Appends Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
+				} catch (SQLException e) {
+					System.out.println("\nFailure to append records. " + e.toString());
+					e.printStackTrace();
+					SQLException nextE = e.getNextException();
+					while (nextE != null) {
+						System.out.println(nextE.toString());
+						nextE.printStackTrace();
+						nextE = nextE.getNextException();
+					}
 				} catch (Exception e) {
 					System.out.println("\nFailure to append records.");
 					e.printStackTrace();
@@ -614,7 +677,7 @@ public class DBSync {
 				try { rsFromTable.close(); } catch (Exception e ) {}
 			}
 			if (rsToTable != null) {
-				try { rsFromTable.close(); } catch (Exception e ) {}
+				try { rsToTable.close(); } catch (Exception e ) {}
 			}
 			if (psToTable != null) {
 				try { psToTable.close(); } catch (Exception e ) {}

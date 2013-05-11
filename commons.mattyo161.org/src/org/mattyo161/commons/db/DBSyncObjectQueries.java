@@ -11,6 +11,7 @@ import java.util.Vector;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
+import org.mattyo161.commons.db.schema.SchemaTools;
 
 /**
  * this DBSyncObject takes a series of sql query strings with appropriate "?" value place holders
@@ -285,6 +286,16 @@ public class DBSyncObjectQueries implements DBSyncObject {
 		} else {
 			return conn.prepareStatement(generateSqlDelete());
 		}
+	}
+	
+
+	
+	/**
+	 * Return a Create table string in the desired dbType based on SchemaTools.DBTYP_*
+	 * @return
+	 */
+	public String getCreateTable(int dbType) {
+		return SchemaTools.createTableFromSchema(this.name, this.appendFields, dbType);
 	}
 
 }

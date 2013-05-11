@@ -93,4 +93,10 @@ public interface DBSyncObject {
 	 * Name of the table or object that is being synched
 	 */
 	public String getName();
+	
+	/**
+	 * Return a Create table string in the desired dbType based on SchemaTools.DBTYP_*
+	 * @return
+	 */
+	public String getCreateTable(int dbType);
 }

@@ -12,10 +12,12 @@ import org.apache.commons.lang.StringUtils;
 import org.mattyo161.commons.db.schema.Column;
 import org.mattyo161.commons.db.schema.Index;
 import org.mattyo161.commons.db.schema.IndexColumn;
+import org.mattyo161.commons.db.schema.SchemaTools;
 import org.mattyo161.commons.db.schema.TableSchema;
 
 public class DBSyncObjectTable extends DBSyncObjectQueries {
-
+	private TableSchema tableSchema = null;
+	
 	public DBSyncObjectTable(Connection conn, String tableName) throws SQLException {
 		super(tableName, conn);
 		init(conn, tableName, true);
@@ -27,7 +29,7 @@ public class DBSyncObjectTable extends DBSyncObjectQueries {
 	
 	public void init(Connection conn, String tableName, boolean requirePrimaryKey) throws SQLException {
 		DatabaseMetaData dbMeta = conn.getMetaData();
-		TableSchema tableSchema = new TableSchema(dbMeta, tableName);
+		tableSchema = new TableSchema(dbMeta, tableName);
 		// now that we have the schema we need to get the key fields and the snycFields
 		List cols = tableSchema.getColumns();
 		List appendFields = new Vector();
@@ -80,6 +82,21 @@ public class DBSyncObjectTable extends DBSyncObjectQueries {
 			getUpdateFields().remove(getAppendFields().get(0));
 		}
 		
+	}
+	public TableSchema getTableSchema() {
+		return tableSchema;
+	}
+	public void setTableSchema(TableSchema tableSchema) {
+		this.tableSchema = tableSchema;
+	}
+
+	
+	/**
+	 * Return a Create table string in the desired dbType based on SchemaTools.DBTYP_*
+	 * @return
+	 */
+	public String getCreateTable(int dbType) {
+		return SchemaTools.createTableFromSchema(this.tableSchema, dbType);
 	}
 
 }
