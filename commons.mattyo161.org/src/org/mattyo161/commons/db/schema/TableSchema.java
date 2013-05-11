@@ -36,18 +36,30 @@ public class TableSchema {
 	}
 	
     public TableSchema(DatabaseMetaData md, String tableName) throws java.sql.SQLException {
-        ResultSet rs = md.getTables(null, null, tableName, null);
-        if (rs.next()) {
+        ResultSet rs = null;
+        if (tableName.contains(".")) {
+        	String[] info = tableName.split("\\.",-1);
+        	if (info.length == 1) {
+            	rs = md.getTables(null, null, info[0], null);
+        	} else if (info.length == 2) {
+            	rs = md.getTables(null, info[0], info[1], null);
+        	} else if (info.length == 3) {
+            	rs = md.getTables(info[0], info[1], info[2], null);
+        	}
+        } else {
+        	rs = md.getTables(null, null, tableName, null);
+        }
+        if (rs != null && rs.next()) {
             setCatalog(rs.getString("TABLE_CAT"));
             setSchema(rs.getString("TABLE_SCHEM"));
             setName(rs.getString("TABLE_NAME"));
             setType(rs.getString("TABLE_TYPE"));
             setRemarks(rs.getString("REMARKS"));
-            ResultSet col = md.getColumns(null, null, tableName, null);
+            ResultSet col = md.getColumns(getCatalog(), getSchema(), getName(), null);
             while (col.next()) {
                 this.addColumn(new Column(col));
             }
-            this.indexes = new Indexes(md, tableName);
+            this.indexes = new Indexes(md, getCatalog(), getSchema(), getName());
         }
     }
 	
@@ -59,7 +71,7 @@ public class TableSchema {
             setName(rs.getString("TABLE_NAME"));
             setType(rs.getString("TABLE_TYPE"));
             setRemarks(rs.getString("REMARKS"));
-            ResultSet col = md.getColumns(null, null, tableName, null);
+            ResultSet col = md.getColumns(getCatalog(), getSchema(), tableName, null);
             while (col.next()) {
                 this.addColumn(new Column(col));
             }

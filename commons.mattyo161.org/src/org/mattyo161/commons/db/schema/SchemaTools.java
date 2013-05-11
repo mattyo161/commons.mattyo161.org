@@ -11,6 +11,7 @@ public class SchemaTools {
 	public static final int DBTYPE_MSSQL = 1;
 	public static final int DBTYPE_SYBASE = 2;
 	public static final int DBTYPE_MYSQL = 3;
+	public static final int DBTYPE_POSTGRES = 4;
 	
 	public static void main(String[] args) {
 		try {
@@ -59,6 +60,7 @@ public class SchemaTools {
 		String[] quoteString = getQuoteString(dbtype);
 		switch (dbtype) {
 		case DBTYPE_MSSQL:
+		case DBTYPE_POSTGRES:
 		case DBTYPE_SYBASE:
 			buff.append("create table ").append(quoteString[0]).append(tableName).append(quoteString[1]).append(" (\n\t");
 			for (Iterator i = columns.iterator(); i.hasNext(); ) {
@@ -276,6 +278,79 @@ public class SchemaTools {
 				break;
 			case Types.BIT:
 				buff.append("tinyint");
+				break;
+			}
+			if (col.isNullable()) {
+				buff.append(" NULL");
+			} else {
+				buff.append(" NOT NULL");
+			}
+			if (col.getDefaultValue() != null && !col.getDefaultValue().equals("")) {
+				buff.append(" DEFAULT ").append(col.getDefaultValue());
+			}
+			break;
+		case DBTYPE_POSTGRES:
+			buff.append(quoteString[0]).append(col.getName()).append(quoteString[1])
+				.append("\t");
+			switch (col.getSqlType()) {
+			case Types.CHAR:
+				buff.append("char(").append(col.getSize()).append(")");
+				break;
+			case Types.VARCHAR:
+				buff.append("varchar(").append(col.getSize()).append(")");
+				break;
+			case Types.LONGVARCHAR:
+				buff.append("text");
+				break;
+			case Types.BIGINT:
+				buff.append("bigint");
+				break;
+			case Types.NUMERIC:
+				buff.append("numeric(").append(col.getSize()).append(",").append(col.getDigits()).append(")");
+				break;
+			case Types.INTEGER:
+				buff.append("int");
+				break;
+			case Types.SMALLINT:
+				buff.append("smallint");
+				break;
+			case Types.TINYINT:
+				buff.append("smallint");
+				break;
+			case Types.FLOAT:
+				buff.append("real");
+				break;
+			case Types.REAL:
+			case Types.DOUBLE:
+				buff.append("double precision");
+				break;
+			case Types.DECIMAL:
+				buff.append("decimal(").append(col.getDigits()).append(",").append(col.getRadix()).append(")");
+				break;
+			case Types.DATE:
+				buff.append("date");
+				break;
+			case Types.TIME:
+				buff.append("time");
+				break;
+			case Types.TIMESTAMP:
+				buff.append("timestamp");
+				break;
+			case Types.BOOLEAN:
+				buff.append("boolean");
+				break;
+			case Types.BINARY:
+				buff.append("bytea");
+				break;
+			case Types.VARBINARY:
+				if (col.getSize() <= 255) {
+					buff.append("bytea");
+				} else {
+					buff.append("bytea");
+				}
+				break;
+			case Types.BIT:
+				buff.append("boolean");
 				break;
 			}
 			if (col.isNullable()) {
