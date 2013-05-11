@@ -722,4 +722,40 @@ public class DBConnection implements Connection {
 		myConn.setTypeMap(map);
 	}
 
+	/**
+	 * Take the SQLException passed and print all the stack traces for that exception
+	 * @param e
+	 */
+	public static void printSQLStackTrace(SQLException e) {
+		e.printStackTrace();
+		SQLException nextException = e.getNextException();
+		while (nextException != null) {
+			nextException.printStackTrace();
+			nextException = nextException.getNextException();
+		}
+	}
+	
+	/**
+	 * A quick and simple wrapper method to close ResultSet, Connection, Statements, etc. cleanly in a finally clause
+	 * @param obj
+	 */
+	public static void closeSQLObject(Object obj) {
+		if (obj != null) {
+			try {
+				if (ResultSet.class.isInstance(obj)) {
+					((ResultSet) obj).close();
+				} else if (Statement.class.isInstance(obj)) {
+					((Statement) obj).close();
+				} else if (Connection.class.isInstance(obj)) {
+					((Connection) obj).close();
+				} else if (PreparedStatement.class.isInstance(obj)) {
+					((PreparedStatement) obj).close();
+				}
+			} catch (SQLException e) {
+				printSQLStackTrace(e);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+	}
 }
