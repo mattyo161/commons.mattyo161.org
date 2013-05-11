@@ -27,6 +27,10 @@ public class IndexColumn {
 		this.columnName = columnName;
 		setOrder(order);
 	}
+	public IndexColumn(String columnName) {
+		this.columnName = columnName;
+		setOrder(null);
+	}
 	
 	public String toString() {
 		StringBuffer buff = new StringBuffer();

@@ -1,6 +1,7 @@
 package org.mattyo161.commons.db.schema;
 
 import java.sql.DatabaseMetaData;
+import java.util.List;
 import java.util.Vector;
 
 /**
@@ -15,8 +16,10 @@ import java.util.Vector;
  */
 public class Index {
 	private String indexName = "";
-	private Vector columns = new Vector(20);
+	private String description = "";
+	private List<IndexColumn> columns = new Vector<IndexColumn>();
 	private boolean unique = false;
+	private boolean primaryKey = false;
 	private int type = 0;
 	
 	
@@ -74,10 +77,10 @@ public class Index {
 		this.columns.add(position, column);
 	}
 	
-	public Vector getColumns() {
+	public List<IndexColumn> getColumns() {
 		return columns;
 	}
-	public void setColumns(Vector columns) {
+	public void setColumns(List<IndexColumn> columns) {
 		this.columns = columns;
 	}
 	public String getIndexName() {
@@ -97,6 +100,20 @@ public class Index {
 	}
 	public void setUnique(boolean unique) {
 		this.unique = unique;
+	}
+	public boolean isPrimaryKey() {
+		return primaryKey;
+	}
+	public void setPrimaryKey(boolean primaryKey) {
+		this.primaryKey = primaryKey;
+	}
+
+	public String getDescription() {
+		return description;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
 	}
 	
 	

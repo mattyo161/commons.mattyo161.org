@@ -29,7 +29,7 @@ public class Indexes {
 	 * @return
 	 */
 	public Indexes(DatabaseMetaData metaData, String tableName) {
-		init(metaData, null, tableName);
+		init(metaData, null, null, tableName);
 	}
 
 	/**
@@ -42,15 +42,24 @@ public class Indexes {
 	 * @return
 	 */
 	public Indexes(DatabaseMetaData metaData, String dbName, String tableName) {
-		init(metaData, dbName, tableName);
+		init(metaData, dbName, null, tableName);
+	}
+	
+	public Indexes(DatabaseMetaData metaData, String dbName, String schemaName, String tableName) {
+		init(metaData, dbName, schemaName, tableName);
 	}
 
 	private void init(DatabaseMetaData metaData, String dbName, String tableName) {
+		init(metaData, dbName, null, tableName);
+	}
+	
+	private void init(DatabaseMetaData metaData, String dbName, String schemaName, String tableName) {
 		// reset the current index list
 		this.indexes = new Vector();
 		try {
 			if (metaData != null) {
-				ResultSet rs = metaData.getIndexInfo(dbName, null, tableName, false, true);
+				ResultSet rs = metaData.getIndexInfo(dbName, schemaName, tableName, false, true);
+				// This will be used in the case that the ordinal position is not set.
 				while (rs.next()) {
 					// we want to ignore statistic indexes
 					if (rs.getInt("type") != DatabaseMetaData.tableIndexStatistic) {
@@ -66,7 +75,13 @@ public class Indexes {
 						}
 						// Now we need to add the current column
 						IndexColumn currColumn = new IndexColumn(rs.getString("column_name"), rs.getString("asc_or_desc"));
-						currIndex.addColumn(currColumn, rs.getInt("ORDINAL_POSITION") - 1);
+						int ordinalPosition = rs.getInt("ORDINAL_POSITION");
+						if (ordinalPosition > 0) {
+							currIndex.addColumn(currColumn, ordinalPosition - 1);
+						} else {
+							currIndex.addColumn(currColumn);
+						}
+						
 					}
 				}
 			}
