@@ -80,7 +80,7 @@ public class DBSync {
 		ResultSet rsToTable = null;
 		ResultSet rsFromTable = null;
 
-
+		
 		try {
 
 			System.out.println("Synching table '" + fromTableName + "' " +
@@ -228,10 +228,12 @@ public class DBSync {
 					for (int j = 0; j < toTable.getKeyFields().size(); j++) {
 						Object toObj = getSqlValue(rsToTable, toTable.getKeyFields().get(j));
 						Object fromObj = getSqlValue(rsFromTable, fromTable.getKeyFields().get(j));
+						// we need to get the sorting position of at least the toTable, since they should both match only one is needed
+						int keySort = toTable.getKeySort().get(j).intValue();
 						int test = -1;
 						int colType = rsSchema.getColumn(toTable.getKeyFields().get(j)).getSqlType();
 						try {
-							test = compareSqlObject(colType, toObj, fromObj);
+							test = compareSqlObject(colType, toObj, fromObj) * keySort;
 						} catch (Exception e) {
 							System.out.println("Error comparing fields " +
 									fromTable.getKeyFields().get(j) + " (" + fromObj + ") -> " +
@@ -432,6 +434,9 @@ public class DBSync {
 					Cal sqlStartTime = new Cal();
 					try {
 						int[] deleteReturn = psToTableDelete.executeBatch();
+						if (!toTable.getAutoCommit()) {
+							toTable.commit();
+						}
 						int successfulUpdates = 0;
 						int failedUpdates = 0;
 						for (int y = 0; y < deleteReturn.length; y++) {
@@ -465,6 +470,9 @@ public class DBSync {
 					Cal sqlStartTime = new Cal();
 					try {
 						int[] updateReturn = psToTableUpdate.executeBatch();
+						if (!toTable.getAutoCommit()) {
+							toTable.commit();
+						}
 						int successfulUpdates = 0;
 						int failedUpdates = 0;
 						for (int y = 0; y < updateReturn.length; y++) {
@@ -501,6 +509,9 @@ public class DBSync {
 						Cal sqlStartTime = new Cal();
 						try {
 							int[] deleteReturn = psToTableDelete.executeBatch();
+							if (!toTable.getAutoCommit()) {
+								toTable.commit();
+							}
 							int successfulUpdates = 0;
 							int failedUpdates = 0;
 							for (int y = 0; y < deleteReturn.length; y++) {
@@ -533,6 +544,9 @@ public class DBSync {
 					Cal sqlStartTime = new Cal();
 					try {
 						int[] appendReturn = psToTableAppend.executeBatch();
+						if (!toTable.getAutoCommit()) {
+							toTable.commit();
+						}
 						int successfulUpdates = 0;
 						int failedUpdates = 0;
 						for (int y = 0; y < appendReturn.length; y++) {
@@ -573,6 +587,9 @@ public class DBSync {
 				Cal sqlStartTime = new Cal();
 				try {
 					int[] updateReturn = psToTableUpdate.executeBatch();
+					if (!toTable.getAutoCommit()) {
+						toTable.commit();
+					}
 					int successfulUpdates = 0;
 					int failedUpdates = 0;
 					for (int y = 0; y < updateReturn.length; y++) {
@@ -606,6 +623,9 @@ public class DBSync {
 				Cal sqlStartTime = new Cal();
 				try {
 					int[] deleteReturn = psToTableDelete.executeBatch();
+					if (!toTable.getAutoCommit()) {
+						toTable.commit();
+					}
 					int successfulUpdates = 0;
 					int failedUpdates = 0;
 					for (int y = 0; y < deleteReturn.length; y++) {
@@ -639,6 +659,9 @@ public class DBSync {
 				Cal sqlStartTime = new Cal();
 				try {
 					int[] appendReturn = psToTableAppend.executeBatch();
+					if (!toTable.getAutoCommit()) {
+						toTable.commit();
+					}
 					int successfulUpdates = 0;
 					int failedUpdates = 0;
 					for (int y = 0; y < appendReturn.length; y++) {
@@ -743,7 +766,23 @@ public class DBSync {
 		case Types.INTEGER:
 		case Types.SMALLINT:
 		case Types.TINYINT:
-			test = ((Integer) toObj).equals(fromObj);
+			long a = 0;
+			long b = 0;
+			if (Integer.class.isInstance(fromObj)) {
+				a = ((Integer) fromObj).longValue();
+			} else if (Long.class.isInstance(fromObj)) {
+				a = ((Long) fromObj).longValue();
+			} else {
+				a = (new Long(fromObj.toString())).longValue();
+			}
+			if (Integer.class.isInstance(toObj)) {
+				b = ((Integer) toObj).longValue();
+			} else if (Long.class.isInstance(toObj)) {
+				b = ((Long) toObj).longValue();
+			} else {
+				b = (new Long(toObj.toString())).longValue();
+			}
+			test = (a == b);
 			break;
 		case Types.FLOAT:
 		case Types.REAL:

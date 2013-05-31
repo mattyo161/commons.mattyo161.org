@@ -32,6 +32,7 @@ public class DBSyncObjectQueries implements DBSyncObject {
 	private List appendFields;
 	private List updateFields;
 	private List keyFields;
+	private List<Integer> keySort;
 	private String name = "";
 	
 	public DBSyncObjectQueries(String name, Connection conn) {
@@ -187,11 +188,12 @@ public class DBSyncObjectQueries implements DBSyncObject {
 	public void setAppendFields(List appendFields) {
 		this.appendFields = appendFields;
 	}
-
+	
 	public void setKeyFields(Object[] keyFields) {
 		this.keyFields = new Vector();
 		CollectionUtils.addAll(this.keyFields, keyFields);
 	}
+	
 
 	public void setAppendFields(Object[] appendFields) {
 		this.appendFields = new Vector();
@@ -211,6 +213,28 @@ public class DBSyncObjectQueries implements DBSyncObject {
 		this.updateFields = updateFields;
 	}
 
+	public void setKeySort(Integer[] keySort) {
+		this.keySort = new Vector<Integer>();
+		CollectionUtils.addAll(this.keySort, keySort);
+	}
+	
+	public void setKeySort(List<Integer> keySort) {
+		this.keySort = keySort;
+	}
+	
+	public List<Integer> getKeySort() {
+		if (this.keySort == null) {
+			// we should create it and set them all to 1 the default
+			this.keySort = new Vector<Integer>();
+			for (int i = 0; i < getKeyFields().size(); i++) {
+				this.keySort.add(1);
+			}
+		}
+		return this.keySort;
+	}
+
+
+	
 	/**
 	 * Automatically generate all the update sql statements (Append, Update and Delete) based on appropriate generate sql methods.
 	 *
@@ -297,5 +321,29 @@ public class DBSyncObjectQueries implements DBSyncObject {
 	public String getCreateTable(int dbType) {
 		return SchemaTools.createTableFromSchema(this.name, this.appendFields, dbType);
 	}
+
+	public boolean getAutoCommit() {
+		try {
+			if (this.conn != null) {
+				return this.conn.getAutoCommit();
+			}
+		} catch (SQLException e) {
+			DBConnection.printSQLStackTrace(e);
+		}
+		return false;
+	}
+
+	public void commit() {
+		try {
+			if (this.conn != null) {
+				if (!this.conn.getAutoCommit()) {
+					this.conn.commit();
+				}
+			}
+		} catch (SQLException e) {
+			DBConnection.printSQLStackTrace(e);
+		}
+	}
+
 
 }

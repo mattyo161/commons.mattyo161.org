@@ -68,18 +68,54 @@ public class DBSyncObjectTable extends DBSyncObjectQueries {
 		setUpdateFields(updateFields);
 		
 		// now lets generate the sql
-		setSqlSelect(generateSqlSelect());
-		setSqlDelete(generateSqlDelete());
-		setSqlAppend(generateSqlAppend());
+		try {
+			setSqlSelect(generateSqlSelect());
+		} catch (SQLException e) {
+			if (requirePrimaryKey) {
+				throw e;
+			} else {
+				System.err.println(e);
+				e.printStackTrace();
+			}
+		}
+		try {
+			setSqlDelete(generateSqlDelete());
+		} catch (SQLException e) {
+			if (requirePrimaryKey) {
+				throw e;
+			} else {
+				System.err.println(e);
+				e.printStackTrace();
+			}
+		}
+		try {
+			setSqlAppend(generateSqlAppend());
+		} catch (SQLException e) {
+			if (requirePrimaryKey) {
+				throw e;
+			} else {
+				System.err.println(e);
+				e.printStackTrace();
+			}
+		}
 		// if update fields is empty which occurs in the case of no Primary key being available then the generateSqlUpdate()
 		// will through an exception so when that is the case we will add a field to updateFields, generate the sql and then
 		// remove the field
-		if (getUpdateFields().size() > 0) {
-			setSqlUpdate(generateSqlUpdate());
-		} else {
-			getUpdateFields().add(getAppendFields().get(0));
-			setSqlUpdate(generateSqlUpdate());
-			getUpdateFields().remove(getAppendFields().get(0));
+		try {
+			if (getUpdateFields().size() > 0) {
+				setSqlUpdate(generateSqlUpdate());
+			} else {
+				getUpdateFields().add(getAppendFields().get(0));
+				setSqlUpdate(generateSqlUpdate());
+				getUpdateFields().remove(getAppendFields().get(0));
+			}
+		} catch (SQLException e) {
+			if (requirePrimaryKey) {
+				throw e;
+			} else {
+				System.err.println(e);
+				e.printStackTrace();
+			}
 		}
 		
 	}
@@ -99,4 +135,34 @@ public class DBSyncObjectTable extends DBSyncObjectQueries {
 		return SchemaTools.createTableFromSchema(this.tableSchema, dbType);
 	}
 
+
+
+	/**
+	 * You will want to run this command if you update the AppendField or KeyFields, this will take
+	 * all the AppendFields and remove the KeyFields and set that UpdateFields to that value. At the
+	 * same time it will reset the UpdateQuery
+	 */
+	public void resetUpdateFields() {
+		// update fields are the appendFields - keyFields
+		List updateFields = new Vector();
+		updateFields.addAll(this.getAppendFields());
+		updateFields.removeAll(this.getKeyFields());
+		setUpdateFields(updateFields);
+
+		// if update fields is empty which occurs in the case of no Primary key being available then the generateSqlUpdate()
+		// will through an exception so when that is the case we will add a field to updateFields, generate the sql and then
+		// remove the field
+		try {
+			if (getUpdateFields().size() > 0) {
+				setSqlUpdate(generateSqlUpdate());
+			} else {
+				getUpdateFields().add(getAppendFields().get(0));
+				setSqlUpdate(generateSqlUpdate());
+				getUpdateFields().remove(getAppendFields().get(0));
+			}
+		} catch (SQLException e) {
+			DBConnection.printSQLStackTrace(e);
+		}
+	}
+	
 }

@@ -88,6 +88,14 @@ public interface DBSyncObject {
 	 * @return
 	 */
 	public List getKeyFields();
+	
+	/**
+	 * A list of integers that are used to set the direction of the sort for that field, by default the direction
+	 * is ascending so the value would be a 1, however if the direction is descending then the value should be -1 to
+	 * reverse the order of the sort. 
+	 * @return
+	 */
+	public List<Integer> getKeySort();
 
 	/**
 	 * Name of the table or object that is being synched
@@ -99,4 +107,14 @@ public interface DBSyncObject {
 	 * @return
 	 */
 	public String getCreateTable(int dbType);
+	
+	/**
+	 * Return whether the connection is an autocommit connection or not
+	 */
+	public boolean getAutoCommit();
+	
+	/**
+	 * If the connection for this object is not set to autocommit then this will execute the commit
+	 */
+	public void commit();
 }
