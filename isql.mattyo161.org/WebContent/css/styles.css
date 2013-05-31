@@ -1,3 +1,14 @@
 body {
 
 }
+
+table.dataTable thead th {
+padding: 3px 7px;
+}
+table.dataTable thead td {
+padding: 3px 7px;
+}
+
+table.dataTable  {
+border-collapse:collapse;
+}

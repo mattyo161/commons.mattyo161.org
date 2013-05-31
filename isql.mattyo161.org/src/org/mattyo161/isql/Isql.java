@@ -39,12 +39,16 @@ public class Isql extends HttpServlet {
         StringBuffer head = new StringBuffer();
         head.append("<head>")
         	.append("<title>Isql Tester</title>")
+        	//.append("<link rel=\"stylesheet\" type=\"text/css\" href=\"" + request.getContextPath() + "/plugins/css/bootstrap.min.css\" />")
+        	//.append("<link rel=\"stylesheet\" type=\"text/css\" href=\"" + request.getContextPath() + "/plugins/css/bootstrap-responsive.min.css\" />")
         	.append("<link rel=\"stylesheet\" type=\"text/css\" href=\"" + request.getContextPath() + "/css/styles.css\" />")
         	.append("<link rel=\"stylesheet\" type=\"text/css\" href=\"" + request.getContextPath() + "/plugins/datatables/css/jquery.dataTables.css\" />")
         	.append("<link rel=\"stylesheet\" type=\"text/css\" href=\"" + request.getContextPath() + "/plugins/scroller/css/dataTables.scroller.css\" />")
         	.append("<link rel=\"stylesheet\" type=\"text/css\" href=\"" + request.getContextPath() + "/plugins/tabletools/css/TableTools.css\" />")
+        	.append("<script src=\"" + request.getContextPath() + "/plugins/js/modernizr-2.6.2-respond-1.1.0.min.js\"></script>")
         	.append("<script src=\"http://code.jquery.com/jquery-1.9.1.min.js\"></script>")
         	.append("<script src=\"http://code.jquery.com/jquery-migrate-1.1.1.min.js\"></script>")
+        	.append("<link rel=\"stylesheet\" type=\"text/css\" href=\"" + request.getContextPath() + "/css/styles.css\" />")
         	.append("</head>")
         	;
         out.println("<html>");
@@ -475,7 +479,37 @@ public class Isql extends HttpServlet {
 	        .append("<script type=\"text/javascript\" src=\"" + request.getContextPath() + "/plugins/tabletools/js/ZeroClipboard.js\"></script>")
 	        .append("<script type=\"text/javascript\" src=\"" + request.getContextPath() + "/plugins/tabletools/js/TableTools.js\"></script>")
 	        .append("<script type=\"text/javascript\" src=\"" + request.getContextPath() + "/plugins/scroller/js/dataTables.scroller.js\"></script>")
-	     	.append("<script type=\"text/javascript\" charset=\"utf-8\">\n")
+        	;
+        if (true) {
+        	dataTables
+	        	.append("		<script type=\"text/javascript\" charset=\"utf-8\">\n")
+	        	.append("			$(document).ready( function () {\n")
+	        	.append("				$('.datatable').dataTable( {\n")
+	        	.append("					\"sDom\": \"<'row-fluid'<'span6'T><'span6'f>r>tS<'row-fluid'<'span5'i><'span2 center'><'span5'>>\",\n")
+	        	.append("					\"sScrollY\": \"500px\",\n")
+	        	.append("					\"bDeferRender\": true,\n")
+	        	.append("					\"aaSorting\": [],\n")
+	        	.append("					\"oTableTools\": {\n")
+	        	.append("						\"sSwfPath\": \"").append(request.getContextPath()).append("/plugins/tabletools/swf/copy_csv_xls_pdf.swf\",\n")
+	        	.append("						\"aButtons\": [\n")
+	        	.append("							\"copy\",\n")
+	        	.append("							\"print\",\n")
+	        	.append("							{\n")
+	        	.append("								\"sExtends\":    \"collection\",\n")
+	        	.append("								\"sButtonText\": 'Save <span class=\"caret\" />',\n")
+	        	.append("								\"aButtons\":    [ \"csv\", \"xls\", \"pdf\" ]\n")
+	        	.append("							}\n")
+	        	.append("						]\n")
+	        	.append("					}\n")
+	        	.append("				} );\n")
+	        	.append("			} );\n")
+	        	.append("		</script>\n")
+	        	.append("\n");
+        	// Add the copy pdf.swf file so that it loads, for some reason it does not work unless it is loaded.
+        	
+        }
+        if (false) {
+	     	dataTables.append("<script type=\"text/javascript\" charset=\"utf-8\">\n")
 	     	.append("$(document).ready(function() {\n")
 	     		.append("$('.datatable').dataTable( {\n")
 		     		.append("\"oTableTools\": {\n")
@@ -483,8 +517,8 @@ public class Isql extends HttpServlet {
 		     		.append("}\n")
 		     	.append("} );")
 	     	.append("} );\n")
-	     	.append("</script>\n")
-     	;
+	     	.append("</script>\n");
+        }
          
         out.println(dataTables.toString());
         out.println("</body>");
