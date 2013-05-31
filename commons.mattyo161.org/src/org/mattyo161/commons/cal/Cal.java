@@ -742,6 +742,7 @@ public class Cal extends GregorianCalendar implements Comparable<Calendar> {
      */    
     public String formatSimpleDate(String formatString) {
         SimpleDateFormat sdf = new SimpleDateFormat(formatString);
+        sdf.setTimeZone(this.getTimeZone());
         return sdf.format(this.getTime());
     }
     
@@ -1348,5 +1349,15 @@ public class Cal extends GregorianCalendar implements Comparable<Calendar> {
      */
     public String getParseFromatString() {
     		return this.parseFormatString;
+    }
+    
+    /**
+     * Return the current Cal in the GMT timezone
+     * @return
+     */
+    public Cal getGMT() {
+    	Cal returnValue = new Cal(this);
+    	returnValue.setTimeZone(TimeZone.getTimeZone("GMT"));
+    	return returnValue;
     }
 }
