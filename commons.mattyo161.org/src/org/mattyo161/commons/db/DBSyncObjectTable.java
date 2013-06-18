@@ -155,9 +155,11 @@ public class DBSyncObjectTable extends DBSyncObjectQueries {
 		try {
 			if (getUpdateFields().size() > 0) {
 				setSqlUpdate(generateSqlUpdate());
+				setSqlDelete(generateSqlDelete());
 			} else {
 				getUpdateFields().add(getAppendFields().get(0));
 				setSqlUpdate(generateSqlUpdate());
+				setSqlDelete(generateSqlDelete());
 				getUpdateFields().remove(getAppendFields().get(0));
 			}
 		} catch (SQLException e) {

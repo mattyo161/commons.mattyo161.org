@@ -5,6 +5,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Vector;
 
@@ -81,7 +82,11 @@ public class DBSyncObjectQueries implements DBSyncObject {
 	 */
 	public String generateSqlSelect() throws SQLException {
 		if (getKeyFields() != null && getKeyFields().size() > 0 && getName() != null && !getName().equals("")) {
-			String sqlSelect = "select * from " + getName() + " order by " + StringUtils.join(getKeyFields().iterator(), ", ");
+			String sqlSelect = "select * from " + getName();
+			if (this.conn.getMetaData().getDatabaseProductName().toLowerCase().indexOf("microsoft") >= 0) {
+				sqlSelect += " with (nolock)";
+			}
+			sqlSelect += " order by " + StringUtils.join(getKeyFields().iterator(), ", ");
 			return sqlSelect;
 		} else {
 			throw new SQLException("Failed to generate SelectSql: KeyFields or Name property are empty or null.");
@@ -186,31 +191,58 @@ public class DBSyncObjectQueries implements DBSyncObject {
 	}
 
 	public void setAppendFields(List appendFields) {
-		this.appendFields = appendFields;
+		// make sure all the fields are lower case
+		this.appendFields = new Vector();
+		for (int i = 0; i < appendFields.size(); i++) {
+			this.appendFields.add(appendFields.get(i).toString().toLowerCase());
+		}
 	}
 	
 	public void setKeyFields(Object[] keyFields) {
 		this.keyFields = new Vector();
-		CollectionUtils.addAll(this.keyFields, keyFields);
+		for (int i = 0; i < keyFields.length; i++) {
+			this.keyFields.add(keyFields[i].toString().toLowerCase());
+		}
 	}
 	
 
 	public void setAppendFields(Object[] appendFields) {
+		setAppendFields(appendFields, false);
+	}
+
+	public void setAppendFields(Object[] appendFields, boolean generateSql) {
 		this.appendFields = new Vector();
-		CollectionUtils.addAll(this.appendFields, appendFields);
+		for (int i = 0; i < appendFields.length; i++) {
+			this.appendFields.add(appendFields[i].toString().toLowerCase());
+		}
+		if (generateSql) {
+			try {
+				this.setSqlAppend(this.generateSqlAppend());
+			} catch (SQLException e) {
+				DBConnection.printSQLStackTrace(e);
+			}
+		}
 	}
 
 	public void setUpdateFields(Object[] updateFields) {
 		this.updateFields = new Vector();
-		CollectionUtils.addAll(this.updateFields, updateFields);
+		for (int i = 0; i < updateFields.length; i++) {
+			this.updateFields.add(updateFields[i].toString().toLowerCase());
+		}
 	}
 
 	public void setKeyFields(List keyFields) {
-		this.keyFields = keyFields;
+		this.keyFields = new Vector();
+		for (int i = 0; i < keyFields.size(); i++) {
+			this.keyFields.add(keyFields.get(i).toString().toLowerCase());
+		}
 	}
 
 	public void setUpdateFields(List updateFields) {
-		this.updateFields = updateFields;
+		this.updateFields = new Vector();
+		for (int i = 0; i < updateFields.size(); i++) {
+			this.updateFields.add(updateFields.get(i).toString().toLowerCase());
+		}
 	}
 
 	public void setKeySort(Integer[] keySort) {

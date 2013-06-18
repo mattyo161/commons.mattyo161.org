@@ -11,8 +11,11 @@ import org.mattyo161.commons.cal.*;
 import org.mattyo161.commons.db.schema.ResultSetSchema;
 
 import java.util.*;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.Reader;
+import java.io.StringReader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
@@ -34,6 +37,8 @@ public class DBSync {
 	long processedRows = 0;
 	// fetchSize
 	int fetchSize = 0;
+	// determine if commit should be done at the end of the session this helps with cursor issues that happen on postgres
+	boolean commitAtEnd = false;
 
 	int incrementalLog = 5000;
 	int incrementalAppend = 5000;
@@ -82,9 +87,10 @@ public class DBSync {
 
 		
 		try {
-
-			System.out.println("Synching table '" + fromTableName + "' " +
+			System.out.println("\n\n" + StringUtils.repeat("*", 50));
+			System.out.println("** Synching table '" + fromTableName + "' " +
 					"to '" + toTableName + "' at " + startTime);
+			System.out.println(StringUtils.repeat("*", 50));
 
 			// build the prepared statements that will be used in the synching process, we will need select statements from
 			// both objects and we will need the update, append and delete statements only from the to object.
@@ -121,7 +127,9 @@ public class DBSync {
 
 
 			// Get the two result sets
+			System.out.println("Getting to table ResultSet at " + new Cal());
 			rsToTable = new DBSyncResultSet(psToTable.executeQuery());
+			System.out.println("Getting from table ResultSet at " + new Cal());
 			rsFromTable = new DBSyncResultSet(psFromTable.executeQuery());
 //			DBSyncObjectQueries tempSync = (DBSyncObjectQueries) fromTable;
 //			ResultSet rsFromTable = tempSync.getConnection().createStatement().executeQuery(tempSync.getSqlSelect());
@@ -129,7 +137,7 @@ public class DBSync {
 			// we will need to loop through all fields defined in append, update and key field lists, if a field is already
 			// defined we will not process it again.
 			ResultSetSchema rsSchema = new ResultSetSchema(rsToTable.getMetaData());
-//			ResultSetSchema fromSchema = new ResultSetSchema(rsFromTable.getMetaData());
+			ResultSetSchema fromSchema = new ResultSetSchema(rsFromTable.getMetaData());
 
 			// get the next rows, make sure to keep track of the returnValues as
 			// these are used to determine
@@ -273,6 +281,7 @@ public class DBSync {
 									Object fromObj = getSqlValue(rsFromTable, fromTable.getUpdateFields().get(k));
 
 									int colType = rsSchema.getColumn(currToField).getSqlType();
+									
 									test = equalsSqlObject(colType, toObj, fromObj);
 
 
@@ -434,7 +443,8 @@ public class DBSync {
 					Cal sqlStartTime = new Cal();
 					try {
 						int[] deleteReturn = psToTableDelete.executeBatch();
-						if (!toTable.getAutoCommit()) {
+						if (!toTable.getAutoCommit() && !isCommitAtEnd()) {
+							System.out.print(" Commiting changes ");
 							toTable.commit();
 						}
 						int successfulUpdates = 0;
@@ -470,7 +480,8 @@ public class DBSync {
 					Cal sqlStartTime = new Cal();
 					try {
 						int[] updateReturn = psToTableUpdate.executeBatch();
-						if (!toTable.getAutoCommit()) {
+						if (!toTable.getAutoCommit() && !isCommitAtEnd()) {
+							System.out.print(" Commiting changes ");
 							toTable.commit();
 						}
 						int successfulUpdates = 0;
@@ -509,7 +520,8 @@ public class DBSync {
 						Cal sqlStartTime = new Cal();
 						try {
 							int[] deleteReturn = psToTableDelete.executeBatch();
-							if (!toTable.getAutoCommit()) {
+							if (!toTable.getAutoCommit() && !isCommitAtEnd()) {
+								System.out.print(" Commiting changes ");
 								toTable.commit();
 							}
 							int successfulUpdates = 0;
@@ -544,7 +556,8 @@ public class DBSync {
 					Cal sqlStartTime = new Cal();
 					try {
 						int[] appendReturn = psToTableAppend.executeBatch();
-						if (!toTable.getAutoCommit()) {
+						if (!toTable.getAutoCommit() && !isCommitAtEnd()) {
+							System.out.print(" Commiting changes ");
 							toTable.commit();
 						}
 						int successfulUpdates = 0;
@@ -587,7 +600,8 @@ public class DBSync {
 				Cal sqlStartTime = new Cal();
 				try {
 					int[] updateReturn = psToTableUpdate.executeBatch();
-					if (!toTable.getAutoCommit()) {
+					if (!toTable.getAutoCommit() && !isCommitAtEnd()) {
+						System.out.print(" Commiting changes ");
 						toTable.commit();
 					}
 					int successfulUpdates = 0;
@@ -623,7 +637,8 @@ public class DBSync {
 				Cal sqlStartTime = new Cal();
 				try {
 					int[] deleteReturn = psToTableDelete.executeBatch();
-					if (!toTable.getAutoCommit()) {
+					if (!toTable.getAutoCommit() && !isCommitAtEnd()) {
+						System.out.print(" Commiting changes ");
 						toTable.commit();
 					}
 					int successfulUpdates = 0;
@@ -659,7 +674,8 @@ public class DBSync {
 				Cal sqlStartTime = new Cal();
 				try {
 					int[] appendReturn = psToTableAppend.executeBatch();
-					if (!toTable.getAutoCommit()) {
+					if (!toTable.getAutoCommit() && !isCommitAtEnd()) {
+						System.out.print(" Commiting changes ");
 						toTable.commit();
 					}
 					int successfulUpdates = 0;
@@ -690,6 +706,13 @@ public class DBSync {
 			if (psToTableAppend != null) { 
 				psToTableAppend.close();
 			}
+
+			if (!toTable.getAutoCommit() && isCommitAtEnd()) {
+				System.out.println("Now processing all commits");
+				Cal startCommitTime = new Cal();
+				toTable.commit();
+				System.out.println("Commits completed in " + (new Cal().diff(startCommitTime)/1000) + " secs");
+			}
 			System.out.println("Done synching table '" + fromTableName + "' " +
 					"to '" + toTableName + "' at " + new Cal() + " in " + (new Cal().diff(startTime)/1000) + " secs");
 		} catch (Exception e) {
@@ -698,27 +721,34 @@ public class DBSync {
 		} finally {
 			if (rsFromTable != null) {
 				try { rsFromTable.close(); } catch (Exception e ) {}
+				rsFromTable = null;
 			}
 			if (rsToTable != null) {
 				try { rsToTable.close(); } catch (Exception e ) {}
+				rsToTable = null;
 			}
 			if (psToTable != null) {
 				try { psToTable.close(); } catch (Exception e ) {}
+				psToTable = null;
 			}
 			if (psFromTable != null) {
 				try { psFromTable.close(); } catch (Exception e ) {}
+				psFromTable = null;
 			}
 			if (psToTableAppend != null) {
 				try { psToTableAppend.close(); } catch (Exception e ) {}
+				psToTableAppend = null;
 			}
 			if (psToTableDelete != null) {
 				try { psToTableDelete.close(); } catch (Exception e ) {}
+				psToTableDelete = null;
 			}
 			if (psToTableUpdate != null) {
 				try { psToTableUpdate.close(); } catch (Exception e ) {}
+				psToTableUpdate = null;
 			}
 		}
-
+		System.gc();
 	}
 
 	private static Object getSqlValue(ResultSet rs, Object currField) throws SQLException {
@@ -730,6 +760,26 @@ public class DBSync {
 			// found an issue converting a sybase timestamp to an object, so we convert it here to a regular sqltimestamp
 			if (com.sybase.jdbc2.tds.SybTimestamp.class.isInstance(theObj)) {
 				theObj = new Cal(theObj).getSqlTimestamp();
+			} else if (Clob.class.isInstance(theObj)) {
+				Clob theClob = (Clob) theObj;
+				StringBuffer buff = new StringBuffer();
+				try {
+					Reader fromReader = theClob.getCharacterStream();
+					char[] fromBuff = new char[1024];
+					int pos = 0;
+					while (pos < theClob.length()) {
+						int fromLen = fromReader.read(fromBuff, 0,1024);
+						buff.append(fromBuff, 0, fromLen);
+						pos += fromLen;
+					}
+//					theObj = new String(new String(buff.toString().getBytes(), "ISO-8859-1").getBytes("UTF8"));
+					theObj = buff.toString();
+				} catch (SQLException e ) {
+					// swallow the exception for now.
+				} catch (IOException e ) {
+					// swallow the exception for now.
+				}
+				
 			}
 			return theObj;
 		}
@@ -758,7 +808,38 @@ public class DBSync {
 		case Types.LONGVARCHAR:
 			// remove trailing spaces from string
 			// comparisons
-			test = ((String) toObj).replaceAll("\\s+$", "").equalsIgnoreCase(((String) fromObj).replaceAll("\\s+$", ""));
+			if (Clob.class.isInstance(fromObj)) {
+				Clob fromClob = (Clob) fromObj;
+				try {
+					if (((String) toObj).length() == fromClob.length()) {
+						Reader toReader = new BufferedReader(new StringReader((String) toObj));
+						Reader fromReader = fromClob.getCharacterStream();
+						char[] toBuff = new char[1024];
+						char[] fromBuff = new char[1024];
+						int pos = 0;
+						boolean clobMatches = true;
+						while (pos < fromClob.length() && clobMatches) {
+							int toLen = toReader.read(toBuff, 0, 1024);
+							fromReader.read(fromBuff, 0,1024);
+							for (int x = 0; x < toLen && clobMatches; x++) {
+								if (toBuff[x] != fromBuff[x]) {
+									clobMatches = false;
+								}
+							}
+							pos += toLen;
+						}
+						if (clobMatches) {
+							test = true;
+						}
+					}
+				} catch (SQLException e ) {
+					// swallow the exception for now.
+				} catch (IOException e ) {
+					// swallow the exception for now.
+				}
+			} else {
+				test = ((String) toObj).replaceAll("\\s+$", "").equalsIgnoreCase(((String) fromObj).replaceAll("\\s+$", ""));
+			}
 			break;
 		case Types.BIGINT:
 			test = ((BigInteger) toObj).equals(fromObj);
@@ -874,6 +955,8 @@ public class DBSync {
 				} catch (IOException e ) {
 					// swallow the exception for now.
 				}
+			} else if (String.class.isInstance(fromObj) && String.class.isInstance(toObj)) {
+				test = toObj.toString().trim().equalsIgnoreCase(fromObj.toString().trim());
 			}
 			break;
 		case Types.BLOB:
@@ -940,7 +1023,22 @@ public class DBSync {
 			test = ((String) toObj).replaceAll("\\s+$", "").compareToIgnoreCase(((String) fromObj).replaceAll("\\s+$", ""));
 			break;
 		case Types.BIGINT:
-			test = ((BigInteger) toObj).compareTo((BigInteger)fromObj);
+			if (BigDecimal.class.isInstance(toObj)) {
+				toObj = ((BigDecimal) toObj).toBigInteger();
+			} else if (Long.class.isInstance(toObj)) {
+				toObj = BigInteger.valueOf(((Long) toObj).longValue());
+			} else if (Integer.class.isInstance(toObj)) {
+				toObj = BigInteger.valueOf(((Integer) toObj).longValue());
+			}
+			if (BigDecimal.class.isInstance(fromObj)) {
+				test = ((BigInteger) toObj).compareTo(((BigDecimal) fromObj).toBigInteger());
+			} else if (BigInteger.class.isInstance(fromObj)) {
+					test = ((BigInteger) toObj).compareTo((BigInteger)fromObj);
+			} else if (Long.class.isInstance(fromObj)) {
+				test = ((BigInteger) toObj).compareTo(BigInteger.valueOf(((Long) fromObj).longValue()));
+			} else if (Integer.class.isInstance(fromObj)) {
+				test = ((BigInteger) toObj).compareTo(BigInteger.valueOf(((Integer) fromObj).longValue()));
+			}
 			break;
 		case Types.INTEGER:
 		case Types.SMALLINT:
@@ -1184,5 +1282,13 @@ public class DBSync {
 	 */
 	public void setFetchSize(int fetchSize) {
 		this.fetchSize = fetchSize;
+	}
+
+	public boolean isCommitAtEnd() {
+		return commitAtEnd;
+	}
+
+	public void setCommitAtEnd(boolean commitAtEnd) {
+		this.commitAtEnd = commitAtEnd;
 	}
 }
