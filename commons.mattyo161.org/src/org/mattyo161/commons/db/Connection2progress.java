@@ -1,6 +1,12 @@
 package org.mattyo161.commons.db;
 
 import java.sql.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Vector;
+
+import org.apache.commons.lang.StringUtils;
 
 /**
  * An implementation of the IConnection2Db Interface which is used to create a connection
@@ -75,7 +81,31 @@ class Connection2progress implements IConnection2Db
         if (password == null) password = "";
         if (db == null) db = "";
         if (options == null) options = "";
- 
+        String[] optionPairs = options.split(";");
+        Map<String, Object> specialOptions = new HashMap<String, Object>();
+        List<String> newOptions = new Vector<String>(); 
+        for (int i = 0; i < optionPairs.length; i++) {
+        	String option = optionPairs[i];
+        	String[] keyValue = option.split("=");
+        	if (keyValue[0].equalsIgnoreCase("TransactionIsolation")) {
+        		if (keyValue[1].equalsIgnoreCase("TRANSACTION_READ_UNCOMMITTED")) {
+        			specialOptions.put("TransactionIsolation", Connection.TRANSACTION_READ_UNCOMMITTED);
+        		} else if (keyValue[1].equalsIgnoreCase("TRANSACTION_NONE")) {
+        			specialOptions.put("TransactionIsolation", Connection.TRANSACTION_NONE);
+        		} else if (keyValue[1].equalsIgnoreCase("TRANSACTION_READ_COMMITTED")) {
+        			specialOptions.put("TransactionIsolation", Connection.TRANSACTION_READ_COMMITTED);
+        		} else if (keyValue[1].equalsIgnoreCase("TRANSACTION_REPEATABLE_READ")) {
+        			specialOptions.put("TransactionIsolation", Connection.TRANSACTION_REPEATABLE_READ);
+        		} else if (keyValue[1].equalsIgnoreCase("TRANSACTION_SERIALIZABLE")) {
+        			specialOptions.put("TransactionIsolation", Connection.TRANSACTION_SERIALIZABLE);
+        		}
+        	} else {
+        		newOptions.add(option);
+        	}
+        }
+        // conn.setTransactionIsolation(Connection.TRANSACTION_READ_UNCOMMITTED);
+        options = StringUtils.join(newOptions.iterator(), ";");
+        
         try {
             // Specify the JDBC driver and URL
             String dbDriver = getJdbcDriver();
@@ -98,6 +128,9 @@ class Connection2progress implements IConnection2Db
             if (dbDriver != "" && dbURL != "") {
                 try {
                     conn = DriverManager.getConnection(dbURL, user, password);
+                	if (specialOptions.containsKey("TransactionIsolation")) {
+                		conn.setTransactionIsolation(((Integer) specialOptions.get("TransactionIsolation")).intValue());
+                	}
                 } catch (Exception e) {
                     String errorString = "Unable to Connect to JDBC Driver:\n" +
                         "DriverClass: " + dbDriver + "\n" +
