@@ -12,3 +12,17 @@ padding: 3px 7px;
 table.dataTable  {
 border-collapse:collapse;
 }
+
+#query {
+	font-size: 12px;
+	line-height: 14px;
+	max-height: 70px;
+	overflow-y: scroll;
+}
+
+#query-escape {
+	font-size: 12px;
+	line-height: 14px;
+	max-height: 14px;
+	overflow-y: scroll;
+}

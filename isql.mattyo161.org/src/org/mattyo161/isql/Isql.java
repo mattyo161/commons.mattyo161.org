@@ -13,25 +13,77 @@ import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.*;
 import javax.servlet.*;
 
+import org.mattyo161.commons.cal.Cal;
 import org.mattyo161.commons.db.*;
 import org.mattyo161.commons.util.MyEnvironment;
+
+import com.sun.msv.util.Uri;
 
 @WebServlet("/Isql")
 public class Isql extends HttpServlet {
     
     /** Holds value of property publication. */
     private String publication;    
+    private int tableCount = 0;
+    private String nullString = "";
+    private boolean showRowCount = false;
     
 
     public Isql() {
         super();
         // TODO Auto-generated constructor stub
+        showRowCount = false;
+        nullString = "";
+        tableCount = 0;
     }
      public void doGet(HttpServletRequest request,
                       HttpServletResponse response)
         throws IOException, ServletException
     {
-        
+         MyEnvironment env = MyEnvironment.getEnvironment();
+         // find available Sources
+         ArrayList envList = env.getKeys();
+         Set sources = new TreeSet();
+         for (Iterator i = envList.iterator(); i.hasNext(); ) {
+             String currValue = (String) i.next();
+             if (currValue.endsWith("_serverType")) {
+                 sources.add(currValue.substring(0,currValue.indexOf("_serverType")));
+             } else if (currValue.endsWith("_dburl")) {
+                 sources.add(currValue.substring(0,currValue.indexOf("_dburl")));
+             }
+         }
+         
+         // Extract values from request
+         String reqSource = request.getParameter("source");
+         String reqType = request.getParameter("type");
+         String reqServer = request.getParameter("server");
+         String reqPort = request.getParameter("port");
+         String reqUser = request.getParameter("user");
+         String reqPassword = request.getParameter("password");
+         String reqDb = request.getParameter("db");
+         String reqSql = request.getParameter("sql");
+         String reqDbUrl = request.getParameter("dburl");
+         String reqFormat = request.getParameter("format");
+         int reqRecStart = 1;
+         int reqRecCount = 50;
+         
+         if (reqSource == null) reqSource = "";
+         if (reqType == null) reqType = "";
+         if (reqServer == null) reqServer = "";
+         if (reqPort == null) reqPort = "";
+         if (reqUser == null) reqUser = "";
+         if (reqPassword == null) reqPassword = "";
+         if (reqDb == null) reqDb = "";
+         if (reqSql == null) reqSql = "";
+         if (reqDbUrl == null) reqDbUrl = "";
+         if (reqFormat == null) reqFormat = "";
+         if (request.getParameter("recstart") != null) {
+             reqRecStart = Integer.parseInt(request.getParameter("recstart"));
+         }
+         if (request.getParameter("reccount") != null) {
+             reqRecCount = Integer.parseInt(request.getParameter("reccount"));
+         }
+         
         response.setContentType("text/html");
         PrintWriter out = response.getWriter();
         
@@ -52,50 +104,17 @@ public class Isql extends HttpServlet {
         	.append("</head>")
         	;
         out.println("<html>");
-        out.println(head.toString());
-        out.println("<body bgcolor=\"white\">");
-        
-        MyEnvironment env = MyEnvironment.getEnvironment();
-        // find available Sources
-        ArrayList envList = env.getKeys();
-        Set sources = new TreeSet();
-        for (Iterator i = envList.iterator(); i.hasNext(); ) {
-            String currValue = (String) i.next();
-            if (currValue.endsWith("_serverType")) {
-                sources.add(currValue.substring(0,currValue.indexOf("_serverType")));
-            } else if (currValue.endsWith("_dburl")) {
-                sources.add(currValue.substring(0,currValue.indexOf("_dburl")));
-            }
+        if (reqFormat.equals("")) {
+        	this.nullString = "&lt;NULL&gt;";
+        	this.showRowCount = true;
+        	out.println(head.toString());
+            out.println("<body bgcolor=\"white\">");
+        } else {
+        	out.println("<head></head>");
+            out.println("<body>");
         }
         
-        // Extract values from request
-        String reqSource = request.getParameter("source");
-        String reqType = request.getParameter("type");
-        String reqServer = request.getParameter("server");
-        String reqPort = request.getParameter("port");
-        String reqUser = request.getParameter("user");
-        String reqPassword = request.getParameter("password");
-        String reqDb = request.getParameter("db");
-        String reqSql = request.getParameter("sql");
-        String reqDbUrl = request.getParameter("dburl");
-        int reqRecStart = 1;
-        int reqRecCount = 50;
-        
-        if (reqSource == null) reqSource = "";
-        if (reqType == null) reqType = "";
-        if (reqServer == null) reqServer = "";
-        if (reqPort == null) reqPort = "";
-        if (reqUser == null) reqUser = "";
-        if (reqPassword == null) reqPassword = "";
-        if (reqDb == null) reqDb = "";
-        if (reqSql == null) reqSql = "";
-        if (reqDbUrl == null) reqDbUrl = "";
-        if (request.getParameter("recstart") != null) {
-            reqRecStart = Integer.parseInt(request.getParameter("recstart"));
-        }
-        if (request.getParameter("reccount") != null) {
-            reqRecCount = Integer.parseInt(request.getParameter("reccount"));
-        }
+
         
         // If reqSource is not empty then we will setup this source and load the values
         // into the variables, it will also disable any of the other choices the user can
@@ -120,85 +139,86 @@ public class Isql extends HttpServlet {
         
         // Lets create a basic form here.
         int leftWidth = 30;
-        out.println("<form name=\"isql\" action=\"\" method=\"post\">");
-        out.println("<table border=\"0\" width=\"90%\">");
-            out.println("<tr>");
-                out.println("<th width=\"" + leftWidth + "\" align=\"right\">Source:</th>");
-                out.println("<td width=\"" + leftWidth + "\">");
-                    out.println("<select name=\"source\">");
-                        if (reqSource.equals("")) {
-                             out.println("<option selected></option>");
-                        } else {
-                            out.println("<option></option>");
-                        }
-                        for (Iterator i = sources.iterator(); i.hasNext(); ) {
-                            String currValue = (String) i.next();
-                            if (currValue.equals(reqSource)) {
-                                out.println("<option selected>" + currValue + "</option>");
-                            } else {
-                                out.println("<option>" + currValue + "</option>");
-                            }
-                        }
-                    out.println("</select>");
-                out.println("<td>");
-            out.println("</tr>");
-            out.println("<tr>");
-                out.println("<th align=\"right\">DBUrl:</th>");
-                out.println("<td colspan=\"5\" width=\"100%\"><input type=\"text\" name=\"dburl\" size=\"90%\" value=\"" + reqDbUrl + "\" /></td>");
-            out.println("</tr>");
-//            out.println("<!-- ");
-//            out.println("<tr>");
-//                out.println("<th>Type:</th>");
-//                out.println("<td>");
-//                    out.println("<select name=\"type\"" + inputDisabled + ">");
-//                        String[] dbTypes = new String("mssql65,mssql7,mssql2000,mysql,sybase").split(",");
-//                        for (int x = 0; x < dbTypes.length; x++) {
-//                            if (reqType.equals(dbTypes[x])) {
-//                                out.println("<option selected>" + dbTypes[x] + "</option>");
-//                            } else {
-//                                out.println("<option>" + dbTypes[x] + "</option>");
-//                            }
-//                        }
-//                        out.println("");
-//                    out.println("</select>");
-//                out.println("</td>");
-//                out.println("<th>Server:</th>");
-//                out.println("<td><input type=\"text\" size=\"20\" name=\"server\" value=\"" + reqServer + "\"" + inputDisabled + ">");
-//                out.println("<th>Port:</th>");
-//                out.println("<td><input type=\"text\" size=\"5\" name=\"port\" value=\"" + reqPort + "\"" + inputDisabled + ">");
-//            out.println("</tr>");
-//            out.println("<tr>");
-//                out.println("<th>User:</th>");
-//                out.println("<td><input type=\"text\" size=\"10\" name=\"user\" value=\"" + reqUser + "\"" + inputDisabled + ">");
-//                out.println("<th>Password:</th>");
-//                out.println("<td><input type=\"text\" size=\"10\" name=\"password\" value=\"" + reqPassword + "\"" + inputDisabled + ">");
-//                out.println("<th>Database:</th>");
-//                out.println("<td><input type=\"text\" size=\"20\" name=\"db\" value=\"" + reqDb + "\"" + inputDisabled + ">");
-//            out.println("</tr>");
-//            out.println("-->");
-            out.println("<tr>");
-                out.println("<td valign=\"top\" align=\"right\"><b>SQL:</b><br /><a href=\"IsqlDocs.html\" target=\"IsqlDocs\">[Docs]</a></td>");
-                out.println("<td colspan=\"5\">");
-                    out.print("<textarea name=\"sql\" cols=\"80%\" rows=\"6\">");
-                    out.print(reqSql);
-                    out.println("</textarea>");
-                out.println("</td>");
-            out.println("</tr>");
-            out.println("<tr>");
-                out.println("<th width=\"" + leftWidth + "\">RecStart:</th>");
-                out.println("<td width=\"" + leftWidth + "\"><input type=\"text\" size=\"10\" name=\"recstart\" value=\"" + reqRecStart + "\">");
-                out.println("<th width=\"" + leftWidth + "\">RecCount:</th>");
-                out.println("<td width=\"" + leftWidth + "\"><input type=\"text\" size=\"10\" name=\"reccount\" value=\"" + reqRecCount + "\">");
-                out.println("<td width=\"" + leftWidth + "\">&nbsp</td>");
-                out.println("<td width=\"" + leftWidth + "\">&nbsp</td>");
-            out.println("</tr>");
-            out.println("<tr><td colspan=\"6\"><center>");
-                out.println("<input type=\"submit\">");
-            out.println("</center></td></tr>");
-         out.println("</table>");
-        out.println("</form>");
-        out.println("<hr>");
-
+	    if (reqFormat.equals("")) {
+	        out.println("<form name=\"isql\" action=\"\" method=\"post\">");
+	        out.println("<table border=\"0\" width=\"90%\">");
+	            out.println("<tr>");
+	                out.println("<th width=\"" + leftWidth + "\" align=\"right\">Source:</th>");
+	                out.println("<td width=\"" + leftWidth + "\">");
+	                    out.println("<select name=\"source\">");
+	                        if (reqSource.equals("")) {
+	                             out.println("<option selected></option>");
+	                        } else {
+	                            out.println("<option></option>");
+	                        }
+	                        for (Iterator i = sources.iterator(); i.hasNext(); ) {
+	                            String currValue = (String) i.next();
+	                            if (currValue.equals(reqSource)) {
+	                                out.println("<option selected>" + currValue + "</option>");
+	                            } else {
+	                                out.println("<option>" + currValue + "</option>");
+	                            }
+	                        }
+	                    out.println("</select>");
+	                out.println("<td>");
+	            out.println("</tr>");
+	            out.println("<tr>");
+	                out.println("<th align=\"right\">DBUrl:</th>");
+	                out.println("<td colspan=\"5\" width=\"100%\"><input type=\"text\" name=\"dburl\" size=\"90%\" value=\"" + reqDbUrl + "\" /></td>");
+	            out.println("</tr>");
+	//            out.println("<!-- ");
+	//            out.println("<tr>");
+	//                out.println("<th>Type:</th>");
+	//                out.println("<td>");
+	//                    out.println("<select name=\"type\"" + inputDisabled + ">");
+	//                        String[] dbTypes = new String("mssql65,mssql7,mssql2000,mysql,sybase").split(",");
+	//                        for (int x = 0; x < dbTypes.length; x++) {
+	//                            if (reqType.equals(dbTypes[x])) {
+	//                                out.println("<option selected>" + dbTypes[x] + "</option>");
+	//                            } else {
+	//                                out.println("<option>" + dbTypes[x] + "</option>");
+	//                            }
+	//                        }
+	//                        out.println("");
+	//                    out.println("</select>");
+	//                out.println("</td>");
+	//                out.println("<th>Server:</th>");
+	//                out.println("<td><input type=\"text\" size=\"20\" name=\"server\" value=\"" + reqServer + "\"" + inputDisabled + ">");
+	//                out.println("<th>Port:</th>");
+	//                out.println("<td><input type=\"text\" size=\"5\" name=\"port\" value=\"" + reqPort + "\"" + inputDisabled + ">");
+	//            out.println("</tr>");
+	//            out.println("<tr>");
+	//                out.println("<th>User:</th>");
+	//                out.println("<td><input type=\"text\" size=\"10\" name=\"user\" value=\"" + reqUser + "\"" + inputDisabled + ">");
+	//                out.println("<th>Password:</th>");
+	//                out.println("<td><input type=\"text\" size=\"10\" name=\"password\" value=\"" + reqPassword + "\"" + inputDisabled + ">");
+	//                out.println("<th>Database:</th>");
+	//                out.println("<td><input type=\"text\" size=\"20\" name=\"db\" value=\"" + reqDb + "\"" + inputDisabled + ">");
+	//            out.println("</tr>");
+	//            out.println("-->");
+	            out.println("<tr>");
+	                out.println("<td valign=\"top\" align=\"right\"><b>SQL:</b><br /><a href=\"IsqlDocs.html\" target=\"IsqlDocs\">[Docs]</a></td>");
+	                out.println("<td colspan=\"5\">");
+	                    out.print("<textarea name=\"sql\" cols=\"80%\" rows=\"6\">");
+	                    out.print(reqSql);
+	                    out.println("</textarea>");
+	                out.println("</td>");
+	            out.println("</tr>");
+	            out.println("<tr>");
+	                out.println("<th width=\"" + leftWidth + "\">RecStart:</th>");
+	                out.println("<td width=\"" + leftWidth + "\"><input type=\"text\" size=\"10\" name=\"recstart\" value=\"" + reqRecStart + "\">");
+	                out.println("<th width=\"" + leftWidth + "\">RecCount:</th>");
+	                out.println("<td width=\"" + leftWidth + "\"><input type=\"text\" size=\"10\" name=\"reccount\" value=\"" + reqRecCount + "\">");
+	                out.println("<td width=\"" + leftWidth + "\">&nbsp</td>");
+	                out.println("<td width=\"" + leftWidth + "\">&nbsp</td>");
+	            out.println("</tr>");
+	            out.println("<tr><td colspan=\"6\"><center>");
+	                out.println("<input type=\"submit\">");
+	            out.println("</center></td></tr>");
+	         out.println("</table>");
+	        out.println("</form>");
+	        out.println("<hr>");
+	    }
         
         
             try {
@@ -235,7 +255,8 @@ public class Isql extends HttpServlet {
                     if (!reqSql.equals("") && reqSql != null) {
                         String[] sqlCmds = reqSql.split(";\\s*([\\n\\r]|$)");
                         for (int line = 0; line < sqlCmds.length; line++) {
-                            reqSql = sqlCmds[line];
+                        	Cal startSQL = new Cal();
+                            reqSql = sqlCmds[line].trim();
                             out.println("<!-- " + reqSql + " -->");
                             
                             // lets see if we are working with a list
@@ -393,28 +414,36 @@ public class Isql extends HttpServlet {
 	                                        System.out.println(e.toString());
 	                                    //    rs.beforeFirst();
 	                                    }
-	                                    out.println("<p><center>&lt;SQL: " + reqSql + "&gt;</center></p>");
-	                                    out.println("NumRows = " + NumberFormat.getInstance().format(numRows) + "</ br>");
-	                                    out.println("MaxRows = " + NumberFormat.getInstance().format(stmt.getMaxRows()) + "</ br>");
-	                                    // removed because it was causing sybase driver to hang not sure why but don't need.
-	                                    //out.println("RSHoldability = " + stmt.getResultSetHoldability() + "</ br>");
-	                                   out.println("RSConcurency = " + stmt.getResultSetConcurrency() + "</ br>");
-	                                   out.println("RSType = " + stmt.getResultSetType() + "</ br>");
+	                                    if (reqFormat.equals("")) {
+		                                    out.println("<p id=\"query\">" + reqSql + "</p>");
+		                                    out.println("<p id=\"query-escape\">" + Uri.escapeDisallowedChars(reqSql) + "</p>");
+		                                    out.println("NumRows = " + NumberFormat.getInstance().format(numRows) + "</ br>");
+		                                    out.println("MaxRows = " + NumberFormat.getInstance().format(stmt.getMaxRows()) + "</ br>");
+		                                    // removed because it was causing sybase driver to hang not sure why but don't need.
+		                                    //out.println("RSHoldability = " + stmt.getResultSetHoldability() + "</ br>");
+		                                   out.println("RSConcurency = " + stmt.getResultSetConcurrency() + "</ br>");
+		                                   out.println("RSType = " + stmt.getResultSetType() + "</ br>");
+	                                    }
 	                                    printResultSet(rs, reqRecCount, out);
 	                                    rs.close();
 	                                } else {
-	                                    out.println("<p><center>&lt;SQL: " + reqSql + "&gt;</center></p>");
+	                                    if (reqFormat.equals("")) {
+		                                    out.println("<p id=\"query\">" + reqSql + "</p>");
+		                                    out.println("<p id=\"query-escape\">" + Uri.escapeDisallowedChars(reqSql) + "</p>");
+	                                    }
 	                                    // make sure that the sql begins with readonly code like select or sp_help
 	                                    if (Pattern.compile("^(select|sp_help)",Pattern.CASE_INSENSITIVE).matcher(reqSql).find()) {
 		                                    boolean moreResults = stmt.execute(reqSql);
 		                                    if (!moreResults) {
 		                                        moreResults = stmt.getMoreResults();
 		                                    }
-		                                    out.println("MaxRows = " + NumberFormat.getInstance().format(stmt.getMaxRows()) + "</ br>");
-		                                    // removed because it was causing sybase driver to hang not sure why but don't need.
-		                                    //out.println("RSHoldability = " + stmt.getResultSetHoldability() + "</ br>");
-		                                   out.println("RSConcurency = " + stmt.getResultSetConcurrency() + "</ br>");
-		                                   out.println("RSType = " + stmt.getResultSetType() + "</ br>");
+		                                    if (reqFormat.equals("")) {
+			                                    out.println("MaxRows = " + NumberFormat.getInstance().format(stmt.getMaxRows()) + "</ br>");
+			                                    // removed because it was causing sybase driver to hang not sure why but don't need.
+			                                    //out.println("RSHoldability = " + stmt.getResultSetHoldability() + "</ br>");
+			                                   out.println("RSConcurency = " + stmt.getResultSetConcurrency() + "</ br>");
+			                                   out.println("RSType = " + stmt.getResultSetType() + "</ br>");
+		                                    }
 		                                    while (moreResults) {
 		                                        rs = stmt.getResultSet();
 		                                        printResultSet(rs,reqRecCount, out);
@@ -426,9 +455,14 @@ public class Isql extends HttpServlet {
 	                                }
 	                            }
                             }
+                            if (reqFormat.equals("")) {
+                            	out.println("<pre>Query processed in " + (new Cal().diff(startSQL)) + " ms</pre>");
+                            }
                         }
                     } else {
-                        out.println("<p><center>&lt;sql statement is empty no data to return&gt;</center></p>");
+                        if (reqFormat.equals("")) {
+                        	out.println("<p><center>&lt;sql statement is empty no data to return&gt;</center></p>");
+                        }
                     }
                     stmt.close();
                 }
@@ -442,18 +476,19 @@ public class Isql extends HttpServlet {
                 System.out.println(e.toString());
                 e.printStackTrace();
             }
-
             if (conn != null) {
                 try {
                     DatabaseMetaData dbMeta = conn.getMetaData();
-                    out.println("<hr>");
-                    out.println("<b>DataBase metaData</b><br>");
-                    out.println("DriverName = <i>" + dbMeta.getDriverName() + "</i><br>");
-                    out.println("DriverVersion = <i>" + dbMeta.getDriverVersion() + "</i><br>");
-                    out.println("DatabaseProductName = <i>" + dbMeta.getDatabaseProductName() + "</i><br>");
-                    out.println("DatabaseProductVersion = <i>" + dbMeta.getDatabaseProductVersion() + "</i><br>");
-                    out.println("JDBC Driver = <i>" + conn.getJdbcDriver() + "</i><br>");
-                    out.println("JDBC URL = <i>" + conn.getJdbcUrl() + "</i><br>");
+                    if (reqFormat.equals("")) {
+	                    out.println("<hr>");
+	                    out.println("<b>DataBase metaData</b><br>");
+	                    out.println("DriverName = <i>" + dbMeta.getDriverName() + "</i><br>");
+	                    out.println("DriverVersion = <i>" + dbMeta.getDriverVersion() + "</i><br>");
+	                    out.println("DatabaseProductName = <i>" + dbMeta.getDatabaseProductName() + "</i><br>");
+	                    out.println("DatabaseProductVersion = <i>" + dbMeta.getDatabaseProductVersion() + "</i><br>");
+	                    out.println("JDBC Driver = <i>" + conn.getJdbcDriver() + "</i><br>");
+	                    out.println("JDBC URL = <i>" + conn.getJdbcUrl() + "</i><br>");
+                    }
                 } catch (Exception e) {
                     out.println(e.toString());
                     System.out.println(e.toString());
@@ -519,8 +554,9 @@ public class Isql extends HttpServlet {
 	     	.append("} );\n")
 	     	.append("</script>\n");
         }
-         
-        out.println(dataTables.toString());
+        if (reqFormat.equals("")) {
+        	out.println(dataTables.toString());
+        }
         out.println("</body>");
         out.println("</html>");
         
@@ -540,14 +576,17 @@ public class Isql extends HttpServlet {
     }
     
      private void printResultSet(ResultSet rs, int maxRows, PrintWriter out) {
+    	this.tableCount++;
         ResultSetMetaData rsmd = null;
         try {
             rsmd = rs.getMetaData();
-            out.println("<table class=\"datatable\" border=\"1\">");
+            out.println("<table id=\"isql-table-" + this.tableCount + "\" class=\"datatable\" border=\"1\">");
             int currRow = 0;
             int numCols = rsmd.getColumnCount();
             out.print("<thead><tr>");
-            out.print("<th>Row#</th>");
+            if (this.showRowCount) {
+            	out.print("<th>Row#</th>");
+            }
             for (int currCol = 1; currCol <= numCols; currCol++) {
                 out.print("<th>" + rsmd.getColumnName(currCol) + "</th>");
             }
@@ -556,16 +595,18 @@ public class Isql extends HttpServlet {
             while (rs.next() && currRow++ < maxRows)
             {
                 out.print("<tr>");
-                out.print("<td>" + rs.getRow() + "</td>");
+                if (this.showRowCount) {
+                	out.print("<td>" + rs.getRow() + "</td>");
+                }
                 for (int currCol = 1; currCol <= numCols; currCol++) {
                     currValue = rs.getString(currCol);
                     if (currValue == null) {
-                        currValue = "&lt;NULL&gt;";
+                        currValue = this.nullString;
                     } else {
                         currValue = currValue.toString().trim().replaceAll("&","&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
                     }
                     if (rs.wasNull()) {
-                        currValue = "&lt;NULL&gt;";
+                        currValue = this.nullString;
                     } else if (currValue.equals("")) {
                         currValue = "&#160;";
                     }

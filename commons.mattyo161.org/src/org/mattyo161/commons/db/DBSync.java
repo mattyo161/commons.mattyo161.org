@@ -8,6 +8,7 @@ package org.mattyo161.commons.db;
 import java.sql.*;
 
 import org.mattyo161.commons.cal.*;
+import org.mattyo161.commons.db.schema.Column;
 import org.mattyo161.commons.db.schema.ResultSetSchema;
 
 import java.util.*;
@@ -46,9 +47,14 @@ public class DBSync {
 	int incrementalDelete = 5000;
 
 	boolean logAppends = true;
+
 	boolean logDeletes = true;
 	boolean logUpdates = true;
 	boolean logMatches = false;
+	
+	boolean typeMatching = false;
+	
+	private DBSyncLogger dbSyncLogger = null;
 
 
 	public void synchronizeTable(DBSyncObject fromTable, DBSyncObject toTable) {
@@ -60,6 +66,10 @@ public class DBSync {
 
 		//reset counters:
 
+		// Create a new log
+		DBSyncLog log = new DBSyncLog(toTable.getName());
+		this.getDbSyncLogger().add(log);
+		
 		appendRowCount = 0;
 		appendRowCountExecuted = 0;
 		deleteRowCount = 0;
@@ -145,7 +155,7 @@ public class DBSync {
 			boolean rsToTableNext = rsToTable.next();
 			boolean rsFromTableNext = rsFromTable.next();
 			while (rsToTableNext || rsFromTableNext) {
-
+				log.incrementProcessed();
 				if (++processedRows % incrementalLog == 0) {
 					System.out.println("Processed " + processedRows + " rows after " + (new Cal().diff(startTime)/1000) + " secs.");
 				}
@@ -173,13 +183,18 @@ public class DBSync {
 						for (int j = 0; j < fromTable.getAppendFields().size(); j++) {
 							currField = (String) fromTable.getAppendFields().get(j);
 							try {
-								fromObj = getSqlValue(rsFromTable, fromTable.getAppendFields().get(j));
+								if (isTypeMatching()) {
+									fromObj = getSqlValue(rsFromTable, fromTable.getAppendFields().get(j), rsSchema);
+								} else {
+									fromObj = getSqlValue(rsFromTable, fromTable.getAppendFields().get(j));
+								}
 								psToTableAppend.setObject(j + 1, fromObj);
 							} catch (Exception e) {
 								// Debugging stuff
 								System.out.println(e);
 								e.printStackTrace();
 								// System.out.println("KeyFields: " + keyFields);
+								log.addError("ERROR Appending row (" + tableKey + ") couldn't set field '" + currField + "' to '" + fromObj + "'",e);
 								System.out.println(tableKey);
 								throw new SQLException("ERROR: Setting field '" + currField + "' to '" + fromObj + "' (" + e + ").");
 //								System.out.println("Setting field " + currField + " to \"\"");
@@ -246,6 +261,9 @@ public class DBSync {
 							System.out.println("Error comparing fields " +
 									fromTable.getKeyFields().get(j) + " (" + fromObj + ") -> " +
 									toTable.getKeyFields().get(j) + " (" + toObj + ")");
+							log.addError("Error comparing fields " +
+									fromTable.getKeyFields().get(j) + " (" + fromObj + ") -> " +
+									toTable.getKeyFields().get(j) + " (" + toObj + ")", e);
 							e.printStackTrace();
 							throw new RuntimeException("Failed to compare sql values "+
 									fromTable.getKeyFields().get(j) + " (" + fromObj + ") -> " +
@@ -306,18 +324,28 @@ public class DBSync {
 
 									// first we need to update the new values from the fromTable
 									for (int x = 0; x < fromTable.getUpdateFields().size(); x++) {
-										psToTableUpdate.setObject(x + 1, getSqlValue(rsFromTable, fromTable.getUpdateFields().get(x)));
+										if (isTypeMatching()) {
+											psToTableUpdate.setObject(x + 1, getSqlValue(rsFromTable, fromTable.getUpdateFields().get(x), rsSchema));
+										} else {
+											psToTableUpdate.setObject(x + 1, getSqlValue(rsFromTable, fromTable.getUpdateFields().get(x)));
+										}
 									}
 									// now we need to add the where fields but we have to start at the end of the updateFieldCount
 									int updateFieldCount = fromTable.getUpdateFields().size();
 									for (int x = 0; x < toTable.getKeyFields().size(); x++) {
-										psToTableUpdate.setObject(updateFieldCount + x + 1, getSqlValue(rsToTable, toTable.getKeyFields().get(x)));
+										if (isTypeMatching()) {
+											psToTableUpdate.setObject(updateFieldCount + x + 1, getSqlValue(rsToTable, toTable.getKeyFields().get(x), rsSchema));
+										} else {
+											psToTableUpdate.setObject(updateFieldCount + x + 1, getSqlValue(rsToTable, toTable.getKeyFields().get(x)));
+										}
+
 									}
 
 									updateRowCount++;
 									try {
 										psToTableUpdate.addBatch();
 									} catch (Exception e) {
+										log.addError("UPDATE Error", e);
 										System.out.println("UPDATE Error: " + e.toString());
 									}
 									if (logUpdates) {
@@ -330,7 +358,7 @@ public class DBSync {
 									}
 								}
 							} catch (Exception e) {
-
+								log.addError("Key: (" + tableKey + "); AtField: FromField(" + currFromField + ") ToField(" + currToField + ")", e);
 								System.out.println(tableKey);
 	//							System.out.println("KeyFields: " + keyFields);
 								System.out.println("AtField: FromField(" + currFromField + ") ToField(" + currToField + ")");
@@ -400,12 +428,17 @@ public class DBSync {
 							for (int j = 0; j < fromTable.getAppendFields().size(); j++) {
 								currField = (String) fromTable.getAppendFields().get(j);
 								try {
-									psToTableAppend.setObject(j + 1, getSqlValue(rsFromTable, currField));
+									if (isTypeMatching()) {
+										psToTableAppend.setObject(j + 1, getSqlValue(rsFromTable, currField, rsSchema));
+									} else {
+										psToTableAppend.setObject(j + 1, getSqlValue(rsFromTable, currField));
+									}
 								} catch (Exception e) {
 									// Debugging stuff
 									System.out.println(e);
 									// System.out.println("KeyFields: " +
 									// keyFields);
+									log.addError("Key (" + tableKey + ") Setting field " + currField + " to \"\"", e);
 									System.out.println(tableKey);
 									System.out.println("Setting field " + currField + " to \"\"");
 									psToTableAppend.setString(j + 1, "");
@@ -439,6 +472,7 @@ public class DBSync {
 				// have conflicts
 				if (deleteRowCount % incrementalDelete == 0 && deleteRowCount > deleteRowCountExecuted) { // && !rsToTableNext) {
 					// We need to execute the batch
+					log.startDelete();
 					System.out.print(deleteRowCount + " deletes have accumulated, executing delete after " + (new Cal().diff(startTime) / 1000) + " secs.");
 					Cal sqlStartTime = new Cal();
 					try {
@@ -457,8 +491,11 @@ public class DBSync {
 								failedUpdates++;
 							}
 						}
+						log.incrementDeletes(successfulUpdates);
+						log.incrementFailedDeletes(failedUpdates);
 						System.out.println(" (" + successfulUpdates + " Deletes Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
 					} catch (SQLException e) {
+						log.addError("Failure to delete records", e);
 						System.out.println("\nFailure to delete records. " + e.toString());
 						e.printStackTrace();
 						SQLException nextE = e.getNextException();
@@ -468,14 +505,17 @@ public class DBSync {
 							nextE = nextE.getNextException();
 						}
 					} catch (Exception e) {
+						log.addError("Failure to delete records", e);
 						System.out.println("\nFailure to delete records.");
 						e.printStackTrace();
 					}
+					log.doneDelete();
 					psToTableDelete.clearParameters();
 					deleteRowCountExecuted = deleteRowCount;
 				}
 				if (updateRowCount % incrementalUpdate == 0 && updateRowCount > updateRowCountExecuted) { // && !rsToTableNext) {
 					// We need to execute the batch
+					log.startUpdate();
 					System.out.print(updateRowCount + " updates have accumulated, executing update after " + (new Cal().diff(startTime) / 1000) + " secs.");
 					Cal sqlStartTime = new Cal();
 					try {
@@ -494,8 +534,11 @@ public class DBSync {
 								failedUpdates++;
 							}
 						}
+						log.incrementUpdates(successfulUpdates);
+						log.incrementFailedUpdates(failedUpdates);
 						System.out.println(" (" + successfulUpdates + " Updates Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
 					} catch (SQLException e) {
+						log.addError("Failure to update records", e);
 						System.out.println("\nFailure to update records. " + e.toString());
 						e.printStackTrace();
 						SQLException nextE = e.getNextException();
@@ -505,9 +548,11 @@ public class DBSync {
 							nextE = nextE.getNextException();
 						}
 					} catch (Exception e) {
+						log.addError("Failure to update records", e);
 						System.out.println("\nFailure to update records.");
 						e.printStackTrace();
 					}
+					log.doneUpdate();
 					updateRowCountExecuted = updateRowCount;
 					psToTableUpdate.clearParameters();
 				}
@@ -516,6 +561,7 @@ public class DBSync {
 					// performed
 					if (deleteRowCount > deleteRowCountExecuted) {
 						// We need to execute the batch
+						log.startDelete();
 						System.out.print(deleteRowCount + " deletes have accumulated, executing delete before append.");
 						Cal sqlStartTime = new Cal();
 						try {
@@ -534,8 +580,11 @@ public class DBSync {
 									failedUpdates++;
 								}
 							}
+							log.incrementDeletes(successfulUpdates);
+							log.incrementFailedDeletes(failedUpdates);
 							System.out.println(" (" + successfulUpdates + " Deletes Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
 						} catch (SQLException e) {
+							log.addError("Failure to delete records", e);
 							System.out.println("\nFailure to delete records. " + e.toString());
 							e.printStackTrace();
 							SQLException nextE = e.getNextException();
@@ -545,13 +594,16 @@ public class DBSync {
 								nextE = nextE.getNextException();
 							}
 						} catch (Exception e) {
+							log.addError("Failure to delete records", e);
 							System.out.println("\nFailure to delete records.");
 							e.printStackTrace();
 						}
+						log.doneDelete();
 						psToTableDelete.clearParameters();
 						deleteRowCountExecuted = deleteRowCount;
 					}
 					// We need to execute the batch
+					log.startAppend();
 					System.out.print(appendRowCount + " appends have accumulated, executing insert after " + (new Cal().diff(startTime) / 1000) + " secs.");
 					Cal sqlStartTime = new Cal();
 					try {
@@ -570,8 +622,11 @@ public class DBSync {
 								failedUpdates++;
 							}
 						}
+						log.incrementAppends(successfulUpdates);
+						log.incrementFailedAppends(failedUpdates);
 						System.out.println(" (" + successfulUpdates + " Appends Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
 					} catch (SQLException e) {
+						log.addError("Failure to append records", e);
 						System.out.println("\nFailure to append records. " + e.toString());
 						e.printStackTrace();
 						SQLException nextE = e.getNextException();
@@ -581,9 +636,11 @@ public class DBSync {
 							nextE = nextE.getNextException();
 						}
 					} catch (Exception e) {
+						log.addError("Failure to append records", e);
 						System.out.println("Failure to append records.");
 						e.printStackTrace();
 					}
+					log.doneAppend();
 					psToTableAppend.clearParameters();
 					appendRowCountExecuted = appendRowCount;
 				}
@@ -596,6 +653,7 @@ public class DBSync {
 			System.out.println("Processed " + processedRows + " rows in " + (new Cal().diff(startTime)) + " ms.");
 
 			if (updateRowCount > 0) {
+				log.startUpdate();
 				System.out.print(updateRowCount + " updates have accumulated, executing update after " + (new Cal().diff(startTime) / 1000) + " secs.");
 				Cal sqlStartTime = new Cal();
 				try {
@@ -614,8 +672,11 @@ public class DBSync {
 							failedUpdates++;
 						}
 					}
+					log.incrementUpdates(successfulUpdates);
+					log.incrementFailedUpdates(failedUpdates);
 					System.out.println(" (" + successfulUpdates + " Updates Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
 				} catch (SQLException e) {
+					log.addError("Failure to update records", e);
 					System.out.println("\nFailure to update records. " + e.toString());
 					e.printStackTrace();
 					SQLException nextE = e.getNextException();
@@ -625,14 +686,17 @@ public class DBSync {
 						nextE = nextE.getNextException();
 					}
 				} catch (Exception e) {
+					log.addError("Failure to update records", e);
 					System.out.println("\nFailure to update records.");
 					e.printStackTrace();
 				}
+				log.doneUpdate();
 			}
 			if (psToTableUpdate != null) { 
 				psToTableUpdate.close();
 			}
 			if (deleteRowCount > 0) {
+				log.startDelete();
 				System.out.print(deleteRowCount + " deletes have accumulated, executing delete after " + (new Cal().diff(startTime) / 1000) + " secs.");
 				Cal sqlStartTime = new Cal();
 				try {
@@ -651,8 +715,11 @@ public class DBSync {
 							failedUpdates++;
 						}
 					}
+					log.incrementDeletes(successfulUpdates);
+					log.incrementFailedDeletes(failedUpdates);
 					System.out.println(" (" + successfulUpdates + " Deletes Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
 				} catch (SQLException e) {
+					log.addError("Failure to delete records", e);
 					System.out.println("\nFailure to delete records. " + e.toString());
 					e.printStackTrace();
 					SQLException nextE = e.getNextException();
@@ -662,14 +729,17 @@ public class DBSync {
 						nextE = nextE.getNextException();
 					}
 				} catch (Exception e) {
+					log.addError("Failure to delete records", e);
 					System.out.println("Failure to delete records.");
 					e.printStackTrace();
 				}
+				log.doneDelete();
 			}
 			if (psToTableDelete != null) { 
 				psToTableDelete.close();
 			}
 			if (appendRowCount > 0) {
+				log.startAppend();
 				System.out.print(appendRowCount + " appends have accumulated, executing insert after " + (new Cal().diff(startTime) / 1000) + " secs.");
 				Cal sqlStartTime = new Cal();
 				try {
@@ -688,8 +758,11 @@ public class DBSync {
 							failedUpdates++;
 						}
 					}
+					log.incrementAppends(successfulUpdates);
+					log.incrementFailedAppends(failedUpdates);
 					System.out.println(" (" + successfulUpdates + " Appends Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
 				} catch (SQLException e) {
+					log.addError("Failure to append records", e);
 					System.out.println("\nFailure to append records. " + e.toString());
 					e.printStackTrace();
 					SQLException nextE = e.getNextException();
@@ -699,9 +772,11 @@ public class DBSync {
 						nextE = nextE.getNextException();
 					}
 				} catch (Exception e) {
+					log.addError("Failure to append records", e);
 					System.out.println("\nFailure to append records.");
 					e.printStackTrace();
 				}
+				log.doneAppend();
 			}
 			if (psToTableAppend != null) { 
 				psToTableAppend.close();
@@ -716,6 +791,7 @@ public class DBSync {
 			System.out.println("Done synching table '" + fromTableName + "' " +
 					"to '" + toTableName + "' at " + new Cal() + " in " + (new Cal().diff(startTime)/1000) + " secs");
 		} catch (Exception e) {
+			log.addError("Error in main DBSync clause", e);
 			System.out.println("Error in main DBSync try clause:");
 			e.printStackTrace();
 		} finally {
@@ -749,40 +825,69 @@ public class DBSync {
 			}
 		}
 		System.gc();
+		log.done();
+		System.out.println(log.toString());
 	}
 
+	/**
+	 * Use this version when there are issues matching up the schema values this will make sure that the result that is returned is compatible with the 
+	 * schema that is being written to.
+	 * @param rs
+	 * @param currField
+	 * @param schema
+	 * @return
+	 * @throws SQLException
+	 */
+	private static Object getSqlValue(ResultSet rs, Object currField, ResultSetSchema schema) throws SQLException {
+		// first get the object the regular way
+		Object theObj = getSqlValue(rs, currField);
+		// now we will add some checks based on if the schema and theObj do not match up
+		Column col = schema.getColumn(currField);
+		switch (col.getSqlType()) {
+		case Types.FLOAT:
+		case Types.REAL:
+		case Types.DOUBLE:
+			if (String.class.isInstance(theObj)) {
+				theObj = new Double(theObj.toString());
+			}
+			break;
+		}
+		return theObj;
+	}
+	
 	private static Object getSqlValue(ResultSet rs, Object currField) throws SQLException {
+		Object theObj = null;
 		if (Integer.class.isInstance(currField)) {
-			return rs.getObject(((Integer) currField).intValue());
+			theObj = rs.getObject(((Integer) currField).intValue());
 		} else {
 			// we will assume this is a string.
-			Object theObj = rs.getObject(currField.toString());
-			// found an issue converting a sybase timestamp to an object, so we convert it here to a regular sqltimestamp
-			if (com.sybase.jdbc2.tds.SybTimestamp.class.isInstance(theObj)) {
-				theObj = new Cal(theObj).getSqlTimestamp();
-			} else if (Clob.class.isInstance(theObj)) {
-				Clob theClob = (Clob) theObj;
-				StringBuffer buff = new StringBuffer();
-				try {
-					Reader fromReader = theClob.getCharacterStream();
-					char[] fromBuff = new char[1024];
-					int pos = 0;
-					while (pos < theClob.length()) {
-						int fromLen = fromReader.read(fromBuff, 0,1024);
-						buff.append(fromBuff, 0, fromLen);
-						pos += fromLen;
-					}
-//					theObj = new String(new String(buff.toString().getBytes(), "ISO-8859-1").getBytes("UTF8"));
-					theObj = buff.toString();
-				} catch (SQLException e ) {
-					// swallow the exception for now.
-				} catch (IOException e ) {
-					// swallow the exception for now.
-				}
-				
-			}
-			return theObj;
+			theObj = rs.getObject(currField.toString());
 		}
+		// found an issue converting a sybase timestamp to an object, so we convert it here to a regular sqltimestamp
+		if (com.sybase.jdbc2.tds.SybTimestamp.class.isInstance(theObj)) {
+			theObj = new Cal(theObj).getSqlTimestamp();
+		} else if (Clob.class.isInstance(theObj)) {
+			Clob theClob = (Clob) theObj;
+			StringBuffer buff = new StringBuffer();
+			try {
+				Reader fromReader = theClob.getCharacterStream();
+				char[] fromBuff = new char[1024];
+				int pos = 0;
+				while (pos < theClob.length()) {
+					int fromLen = fromReader.read(fromBuff, 0,1024);
+					buff.append(fromBuff, 0, fromLen);
+					pos += fromLen;
+				}
+//				theObj = new String(new String(buff.toString().getBytes(), "ISO-8859-1").getBytes("UTF8"));
+				theObj = buff.toString();
+			} catch (SQLException e ) {
+				// swallow the exception for now.
+			} catch (IOException e ) {
+				// swallow the exception for now.
+			}
+			
+		}
+		return theObj;
 	}
 
 	private static boolean equalsSqlObject(int matchType, Object toObj, Object fromObj) {
@@ -853,6 +958,10 @@ public class DBSync {
 				a = ((Integer) fromObj).longValue();
 			} else if (Long.class.isInstance(fromObj)) {
 				a = ((Long) fromObj).longValue();
+			} else if (Float.class.isInstance(fromObj)) {
+				a = ((Float) fromObj).longValue();
+			} else if (Double.class.isInstance(fromObj)) {
+				a = ((Double) fromObj).longValue();
 			} else {
 				a = (new Long(fromObj.toString())).longValue();
 			}
@@ -860,10 +969,23 @@ public class DBSync {
 				b = ((Integer) toObj).longValue();
 			} else if (Long.class.isInstance(toObj)) {
 				b = ((Long) toObj).longValue();
+			} else if (Float.class.isInstance(toObj)) {
+				b = ((Long) toObj).longValue();
+			} else if (Double.class.isInstance(toObj)) {
+				b = ((Long) toObj).longValue();
 			} else {
 				b = (new Long(toObj.toString())).longValue();
 			}
 			test = (a == b);
+			break;
+		case Types.BOOLEAN:
+			if (Integer.class.isInstance(fromObj)) {
+				test = ((Boolean) toObj).equals(new Boolean(((Integer) fromObj).intValue() != 0));
+			} else if (String.class.isInstance(fromObj)) {
+				test = ((Boolean) toObj).equals(new Boolean(!((String) fromObj).trim().equals("")));
+			} else if (Boolean.class.isInstance(fromObj)) {
+				test = ((Boolean) toObj).equals((Boolean) fromObj);
+			}
 			break;
 		case Types.FLOAT:
 		case Types.REAL:
@@ -1043,7 +1165,20 @@ public class DBSync {
 		case Types.INTEGER:
 		case Types.SMALLINT:
 		case Types.TINYINT:
-			test = ((Integer) toObj).compareTo((Integer)fromObj);
+			if (Long.class.isInstance(fromObj)) {
+				test = ((Integer) toObj).compareTo(((Long)fromObj).intValue());;
+			} else  {
+				test = ((Integer) toObj).compareTo((Integer)fromObj);
+			}
+			break;
+		case Types.BOOLEAN:
+			if (Integer.class.isInstance(fromObj)) {
+				test = ((Boolean) toObj).compareTo(new Boolean(((Integer) fromObj).intValue() != 0));
+			} else if (String.class.isInstance(fromObj)) {
+				test = ((Boolean) toObj).compareTo(new Boolean(!((String) fromObj).trim().equals("")));
+			} else if (Boolean.class.isInstance(fromObj)) {
+				test = ((Boolean) toObj).compareTo((Boolean) fromObj);
+			}
 			break;
 		case Types.FLOAT:
 		case Types.REAL:
@@ -1290,5 +1425,26 @@ public class DBSync {
 
 	public void setCommitAtEnd(boolean commitAtEnd) {
 		this.commitAtEnd = commitAtEnd;
+	}
+
+	public DBSyncLogger getDbSyncLogger() {
+		if (dbSyncLogger == null) {
+			// lets create one
+			this.dbSyncLogger = new DBSyncLogger();
+		}
+		return dbSyncLogger;
+	}
+
+	public void setDbSyncLogger(DBSyncLogger dbSyncLogger) {
+		this.dbSyncLogger = dbSyncLogger;
+	}
+	
+
+	public boolean isTypeMatching() {
+		return typeMatching;
+	}
+
+	public void setTypeMatching(boolean typeMatching) {
+		this.typeMatching = typeMatching;
 	}
 }

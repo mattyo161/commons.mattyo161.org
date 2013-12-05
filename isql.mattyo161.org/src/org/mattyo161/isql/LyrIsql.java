@@ -15,6 +15,7 @@ import javax.servlet.*;
 
 import net.cabot.lyris.LyrisServer;
 
+import org.mattyo161.commons.cal.Cal;
 import org.mattyo161.commons.db.*;
 import org.mattyo161.commons.util.MyEnvironment;
 
@@ -127,6 +128,7 @@ public class LyrIsql extends HttpServlet {
             	LyrisServer lyris = new LyrisServer();
                 String[] sqlCmds = reqSql.split(";\\s*([\\n\\r]|$)");
                 for (int line = 0; line < sqlCmds.length; line++) {
+                	Cal startSQL = new Cal();
                     reqSql = sqlCmds[line];
                     out.println("<!-- " + reqSql + " -->");
 	                out.println("<p><center>&lt;SQL: " + reqSql + "&gt;</center></p>");
@@ -135,18 +137,21 @@ public class LyrIsql extends HttpServlet {
 	                    // make sure that the top value is set
 	                    if (!Pattern.compile("^select\\s+top\\s+\\d+\\s+",Pattern.CASE_INSENSITIVE).matcher(reqSql).find() &&
 	                    		!Pattern.compile("row_number()",Pattern.CASE_INSENSITIVE).matcher(reqSql).find()) {
-	                    	reqSql = reqSql.replaceFirst("select", "select top " + reqRecCount);
+	                    	reqSql = Pattern.compile("^\\s*select", Pattern.CASE_INSENSITIVE).matcher(reqSql).replaceFirst("select top " + reqRecCount);
 	                    }
 	                	String[][] results = lyris.getSql(reqSql);
 	                    printResultSet(results,reqRecCount, out);
 	                } else {
 	                    out.println("ERROR: this is not a valid Read-Only SQL statement, the statement must begin with select or sp_help");
 	                }
+	                out.println("<pre>Query processed in " + (new Cal().diff(startSQL)) + " ms</pre>");
                 }
             } catch (Exception e) {
+            	out.println("<pre>");
                 out.println(e.toString());
                 System.out.println(e.toString());
                 e.printStackTrace();
+            	out.println("</pre>");
             }
 
         
@@ -155,9 +160,11 @@ public class LyrIsql extends HttpServlet {
                 try {
                     conn.close();
                 } catch (SQLException eSql) {
+                	out.println("<pre>");
                     out.println(eSql.toString());
                     System.out.println(eSql.toString());
                     eSql.printStackTrace();
+                	out.println("</pre>");
                 }
             }
         }

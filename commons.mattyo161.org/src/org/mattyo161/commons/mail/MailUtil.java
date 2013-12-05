@@ -7,11 +7,17 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Vector;
 import java.util.regex.Pattern;
 
+import javax.mail.Message;
+import javax.mail.MessagingException;
+import javax.mail.Session;
+import javax.mail.Transport;
 import javax.mail.internet.AddressException;
 import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
 
 import org.apache.commons.net.smtp.SMTPClient;
 import org.apache.commons.net.smtp.SMTPReply;
@@ -22,6 +28,7 @@ import org.xbill.DNS.Record;
 import org.xbill.DNS.Type;
       
 public class MailUtil {
+	
 	
 	public static boolean sendMail(String toAddress, String fromAddress, String message, String subject) {
 		boolean retVal = false;
