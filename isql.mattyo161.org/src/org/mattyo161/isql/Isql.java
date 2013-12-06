@@ -104,6 +104,8 @@ public class Isql extends HttpServlet {
         	.append("</head>")
         	;
         out.println("<html>");
+        // we need to reinit the instance
+        this.reinit();
         if (reqFormat.equals("")) {
         	this.nullString = "&lt;NULL&gt;";
         	this.showRowCount = true;
@@ -416,7 +418,7 @@ public class Isql extends HttpServlet {
 	                                    }
 	                                    if (reqFormat.equals("")) {
 		                                    out.println("<p id=\"query\">" + reqSql + "</p>");
-		                                    out.println("<p id=\"query-escape\">" + Uri.escapeDisallowedChars(reqSql) + "</p>");
+		                                    out.println("<p id=\"query-escape\">" + Uri.escapeDisallowedChars(reqSql).replaceAll("\\+", "%2b").trim() + "</p>");
 		                                    out.println("NumRows = " + NumberFormat.getInstance().format(numRows) + "</ br>");
 		                                    out.println("MaxRows = " + NumberFormat.getInstance().format(stmt.getMaxRows()) + "</ br>");
 		                                    // removed because it was causing sybase driver to hang not sure why but don't need.
@@ -429,7 +431,7 @@ public class Isql extends HttpServlet {
 	                                } else {
 	                                    if (reqFormat.equals("")) {
 		                                    out.println("<p id=\"query\">" + reqSql + "</p>");
-		                                    out.println("<p id=\"query-escape\">" + Uri.escapeDisallowedChars(reqSql) + "</p>");
+		                                    out.println("<p id=\"query-escape\">" + Uri.escapeDisallowedChars(reqSql).replaceAll("\\+", "%2b").trim() + "</p>");
 	                                    }
 	                                    // make sure that the sql begins with readonly code like select or sp_help
 	                                    if (Pattern.compile("^(select|sp_help)",Pattern.CASE_INSENSITIVE).matcher(reqSql).find()) {
@@ -561,7 +563,13 @@ public class Isql extends HttpServlet {
         out.println("</html>");
         
     }
-    private ArrayList getDbs(Connection conn) {
+    private void reinit() {
+		// TODO Auto-generated method stub
+    	this.showRowCount = false;
+        this.tableCount = 0;
+        this.nullString = "";
+	}
+	private ArrayList getDbs(Connection conn) {
         ArrayList dbNames = new ArrayList();
         try {
             DatabaseMetaData dbMeta = conn.getMetaData();
@@ -580,7 +588,11 @@ public class Isql extends HttpServlet {
         ResultSetMetaData rsmd = null;
         try {
             rsmd = rs.getMetaData();
-            out.println("<table id=\"isql-table-" + this.tableCount + "\" class=\"datatable\" border=\"1\">");
+            if (this.showRowCount) {
+            	out.println("<table id=\"isql-table-" + this.tableCount + "\" class=\"datatable\" border=\"1\">");
+            } else {
+            	out.println("<table id=\"isql-table-" + this.tableCount + "\" class=\"datatable\">");
+            }
             int currRow = 0;
             int numCols = rsmd.getColumnCount();
             out.print("<thead><tr>");
