@@ -35,10 +35,17 @@ public class DBSyncObjectQueries implements DBSyncObject {
 	private List keyFields;
 	private List<Integer> keySort;
 	private String name = "";
+	private String description = null;
 	
 	public DBSyncObjectQueries(String name, Connection conn) {
 		this.name = name;
 		this.conn = conn;
+	}
+	
+	public DBSyncObjectQueries(String name, Connection conn, String description) {
+		this.name = name;
+		this.conn = conn;
+		this.description = description;
 	}
 	
 	public String getSqlAppend() {
@@ -375,6 +382,14 @@ public class DBSyncObjectQueries implements DBSyncObject {
 		} catch (SQLException e) {
 			DBConnection.printSQLStackTrace(e);
 		}
+	}
+
+	public String getDescription() {
+		return description;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
 	}
 
 

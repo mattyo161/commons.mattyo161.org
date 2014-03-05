@@ -22,6 +22,11 @@ public class DBSyncObjectTable extends DBSyncObjectQueries {
 		super(tableName, conn);
 		init(conn, tableName, true);
 	}
+	public DBSyncObjectTable(Connection conn, String tableName, String description) throws SQLException {
+		super(tableName, conn);
+		init(conn, tableName, true);
+		setDescription(description);
+	}
 	public DBSyncObjectTable(Connection conn, String tableName, boolean requirePrimaryKey) throws SQLException {
 		super(tableName, conn);
 		init(conn, tableName, requirePrimaryKey);
