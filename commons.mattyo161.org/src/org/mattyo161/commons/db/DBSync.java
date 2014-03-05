@@ -67,7 +67,11 @@ public class DBSync {
 		//reset counters:
 
 		// Create a new log
-		DBSyncLog log = new DBSyncLog(toTable.getName());
+		String logName = toTable.getName();
+		if (toTable.getDescription() != null && !toTable.getDescription().equals("")) {
+			logName += " - " + toTable.getDescription();
+		}
+		DBSyncLog log = new DBSyncLog(logName);
 		this.getDbSyncLogger().add(log);
 		
 		appendRowCount = 0;
@@ -99,7 +103,7 @@ public class DBSync {
 		try {
 			System.out.println("\n\n" + StringUtils.repeat("*", 50));
 			System.out.println("** Synching table '" + fromTableName + "' " +
-					"to '" + toTableName + "' at " + startTime);
+					"to '" + logName + "' at " + startTime);
 			System.out.println(StringUtils.repeat("*", 50));
 
 			// build the prepared statements that will be used in the synching process, we will need select statements from
