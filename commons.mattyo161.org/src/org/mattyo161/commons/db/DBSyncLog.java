@@ -72,6 +72,74 @@ public class DBSyncLog {
 		}
 		
 		return buff.toString();
+	}	
+	
+	public String toTabDelimHeader() {
+		StringBuffer buff = new StringBuffer();
+		buff.append("Table")
+		.append("\t").append("Processed")
+		.append("\t").append("Time Secs")
+		.append("\t").append("Errors")
+		.append("\t").append("Appends")
+		.append("\t").append("Appends Failed")
+		.append("\t").append("Appends Time ms")
+		.append("\t").append("Deletes")
+		.append("\t").append("Deletes Failed")
+		.append("\t").append("Deletes Time ms")
+		.append("\t").append("Updates")
+		.append("\t").append("Updates Failed")
+		.append("\t").append("Updates Time ms");
+		return buff.toString();
+	}
+	
+	public String toTabDelem() {
+		StringBuffer buff = new StringBuffer();
+		DecimalFormat sFormat = new DecimalFormat("#,##0");
+		DecimalFormat msFormat = new DecimalFormat("#,##0.000");
+		buff.append(this.name).append("\t").append(this.processed).append("\t")
+			.append(msFormat.format(this.endTime.diff(this.startTime)/1000.0)).append("")
+			;
+		if (this.getErrors().size() > 0) {
+			buff.append("\t").append((this.getErrors().size())).append("");
+		} else {
+			buff.append("\t");
+		}
+		if (this.appends > 0) {
+			buff.append("\t").append((this.appends));
+			if (this.failedAppends > 0) {
+				buff.append("\t").append((this.failedAppends)).append("");
+			} else {
+				buff.append("\t");
+			}
+			buff.append("\t").append((this.appendTime)).append("");
+		} else {
+			buff.append("\t\t\t");
+		}
+		if (this.deletes > 0) {
+			buff.append("\t").append((this.deletes));
+			if (this.failedDeletes > 0) {
+				buff.append("\t").append((this.failedDeletes)).append("");
+			} else {
+				buff.append("\t");
+			}
+			buff.append("\t").append((this.deleteTime)).append("");
+		} else {
+			buff.append("\t\t\t");
+		}
+		
+		if (this.updates > 0) {
+			buff.append("\t").append(sFormat.format(this.updates));
+			if (this.failedUpdates > 0) {
+				buff.append("\t").append((this.failedUpdates)).append("");
+			} else {
+				buff.append("\t");
+			}
+			buff.append("\t").append((this.updateTime)).append("");
+		} else {
+			buff.append("\t\t\t");
+		}
+		
+		return buff.toString();
 	}
 	
 	public void addError(Exception e) {
