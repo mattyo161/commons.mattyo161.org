@@ -27,6 +27,8 @@ public class Isql extends HttpServlet {
     private int tableCount = 0;
     private String nullString = "";
     private boolean showRowCount = false;
+    private String reqFormat = "";
+    private String db_name = "";
     
 
     public Isql() {
@@ -35,6 +37,8 @@ public class Isql extends HttpServlet {
         showRowCount = false;
         nullString = "";
         tableCount = 0;
+        reqFormat = "";
+        db_name = "";
     }
      public void doGet(HttpServletRequest request,
                       HttpServletResponse response)
@@ -63,7 +67,7 @@ public class Isql extends HttpServlet {
          String reqDb = request.getParameter("db");
          String reqSql = request.getParameter("sql");
          String reqDbUrl = request.getParameter("dburl");
-         String reqFormat = request.getParameter("format");
+         this.reqFormat = request.getParameter("format");
          int reqRecStart = 1;
          int reqRecCount = 50;
          
@@ -76,14 +80,13 @@ public class Isql extends HttpServlet {
          if (reqDb == null) reqDb = "";
          if (reqSql == null) reqSql = "";
          if (reqDbUrl == null) reqDbUrl = "";
-         if (reqFormat == null) reqFormat = "";
+         if (this.reqFormat == null) this.reqFormat = "";
          if (request.getParameter("recstart") != null) {
              reqRecStart = Integer.parseInt(request.getParameter("recstart"));
          }
          if (request.getParameter("reccount") != null) {
              reqRecCount = Integer.parseInt(request.getParameter("reccount"));
          }
-         
         response.setContentType("text/html");
         PrintWriter out = response.getWriter();
         
@@ -106,7 +109,7 @@ public class Isql extends HttpServlet {
         out.println("<html>");
         // we need to reinit the instance
         this.reinit();
-        if (reqFormat.equals("")) {
+        if (this.reqFormat.equals("")) {
         	this.nullString = "&lt;NULL&gt;";
         	this.showRowCount = true;
         	out.println(head.toString());
@@ -115,7 +118,12 @@ public class Isql extends HttpServlet {
         	out.println("<head></head>");
             out.println("<body>");
         }
-        
+        if (reqSource.equals("")) {
+       	 this.db_name = reqDbUrl;
+        } else {
+       	 this.db_name = reqSource;
+        }
+
 
         
         // If reqSource is not empty then we will setup this source and load the values
@@ -141,7 +149,7 @@ public class Isql extends HttpServlet {
         
         // Lets create a basic form here.
         int leftWidth = 30;
-	    if (reqFormat.equals("")) {
+	    if (this.reqFormat.equals("")) {
 	        out.println("<form name=\"isql\" action=\"\" method=\"post\">");
 	        out.println("<table border=\"0\" width=\"90%\">");
 	            out.println("<tr>");
@@ -416,9 +424,9 @@ public class Isql extends HttpServlet {
 	                                        System.out.println(e.toString());
 	                                    //    rs.beforeFirst();
 	                                    }
-	                                    if (reqFormat.equals("")) {
+	                                    if (this.reqFormat.equals("")) {
 		                                    out.println("<p id=\"query\">" + reqSql + "</p>");
-		                                    out.println("<p id=\"query-escape\">" + Uri.escapeDisallowedChars(reqSql).replaceAll("\\+", "%2b").trim() + "</p>");
+		                                    out.println("<p id=\"query-escape\">" + Uri.escapeDisallowedChars(reqSql.replaceAll("%", "%25").replaceAll("\\+", "%2b")).trim() + "</p>");
 		                                    out.println("NumRows = " + NumberFormat.getInstance().format(numRows) + "</ br>");
 		                                    out.println("MaxRows = " + NumberFormat.getInstance().format(stmt.getMaxRows()) + "</ br>");
 		                                    // removed because it was causing sybase driver to hang not sure why but don't need.
@@ -429,9 +437,9 @@ public class Isql extends HttpServlet {
 	                                    printResultSet(rs, reqRecCount, out);
 	                                    rs.close();
 	                                } else {
-	                                    if (reqFormat.equals("")) {
+	                                    if (this.reqFormat.equals("")) {
 		                                    out.println("<p id=\"query\">" + reqSql + "</p>");
-		                                    out.println("<p id=\"query-escape\">" + Uri.escapeDisallowedChars(reqSql).replaceAll("\\+", "%2b").trim() + "</p>");
+		                                    out.println("<p id=\"query-escape\">" + Uri.escapeDisallowedChars(reqSql.replaceAll("%", "%25").replaceAll("\\+", "%2b")).trim() + "</p>");
 	                                    }
 	                                    // make sure that the sql begins with readonly code like select or sp_help
 	                                    if (Pattern.compile("^(select|sp_help)",Pattern.CASE_INSENSITIVE).matcher(reqSql).find()) {
@@ -439,7 +447,7 @@ public class Isql extends HttpServlet {
 		                                    if (!moreResults) {
 		                                        moreResults = stmt.getMoreResults();
 		                                    }
-		                                    if (reqFormat.equals("")) {
+		                                    if (this.reqFormat.equals("")) {
 			                                    out.println("MaxRows = " + NumberFormat.getInstance().format(stmt.getMaxRows()) + "</ br>");
 			                                    // removed because it was causing sybase driver to hang not sure why but don't need.
 			                                    //out.println("RSHoldability = " + stmt.getResultSetHoldability() + "</ br>");
@@ -457,12 +465,12 @@ public class Isql extends HttpServlet {
 	                                }
 	                            }
                             }
-                            if (reqFormat.equals("")) {
+                            if (this.reqFormat.equals("")) {
                             	out.println("<pre>Query processed in " + (new Cal().diff(startSQL)) + " ms</pre>");
                             }
                         }
                     } else {
-                        if (reqFormat.equals("")) {
+                        if (this.reqFormat.equals("")) {
                         	out.println("<p><center>&lt;sql statement is empty no data to return&gt;</center></p>");
                         }
                     }
@@ -481,7 +489,7 @@ public class Isql extends HttpServlet {
             if (conn != null) {
                 try {
                     DatabaseMetaData dbMeta = conn.getMetaData();
-                    if (reqFormat.equals("")) {
+                    if (this.reqFormat.equals("")) {
 	                    out.println("<hr>");
 	                    out.println("<b>DataBase metaData</b><br>");
 	                    out.println("DriverName = <i>" + dbMeta.getDriverName() + "</i><br>");
@@ -556,7 +564,7 @@ public class Isql extends HttpServlet {
 	     	.append("} );\n")
 	     	.append("</script>\n");
         }
-        if (reqFormat.equals("")) {
+        if (this.reqFormat.equals("")) {
         	out.println(dataTables.toString());
         }
         out.println("</body>");
@@ -596,7 +604,17 @@ public class Isql extends HttpServlet {
             int currRow = 0;
             int numCols = rsmd.getColumnCount();
             out.print("<thead><tr>");
+            if (this.reqFormat.equalsIgnoreCase("tables")) {
+            	if (this.showRowCount) {
+	            	out.print("<th colspan=\"" + (numCols + 1) + "\" style=\"text-align:left;\">");
+	            } else {
+	            	out.print("<th colspan=\"" + (numCols) + "\" style=\"text-align:left;\">");
+	            }
+            	out.print("Updated: " + new Cal().toString() + "; DB: " + this.db_name);
+            	out.print("</th></tr><tr>");
+            }
             if (this.showRowCount) {
+            	
             	out.print("<th>Row#</th>");
             }
             for (int currCol = 1; currCol <= numCols; currCol++) {
