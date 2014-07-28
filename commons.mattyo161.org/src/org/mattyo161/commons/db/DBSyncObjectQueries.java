@@ -36,6 +36,8 @@ public class DBSyncObjectQueries implements DBSyncObject {
 	private List<Integer> keySort;
 	private String name = "";
 	private String description = null;
+	private int updateTimeout = 0;
+	private int appendTimeout = 0;
 	
 	public DBSyncObjectQueries(String name, Connection conn) {
 		this.name = name;
@@ -392,5 +394,24 @@ public class DBSyncObjectQueries implements DBSyncObject {
 		this.description = description;
 	}
 
+	public Connection getConnection() {
+		return this.conn;
+	}
+
+	public void setUpdateTimeout(int updateTimeout) {
+		this.updateTimeout = updateTimeout;
+	}
+
+	public void setAppendTimeout(int appendTimeout) {
+		this.appendTimeout = appendTimeout;
+	}
+
+	public int getUpdateTimeout() {
+		return updateTimeout;
+	}
+
+	public int getAppendTimeout() {
+		return appendTimeout;
+	}
 
 }

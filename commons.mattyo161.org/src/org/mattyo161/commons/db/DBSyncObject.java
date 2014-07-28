@@ -1,5 +1,6 @@
 package org.mattyo161.commons.db;
 
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.List;
@@ -122,4 +123,20 @@ public interface DBSyncObject {
 	 * If the connection for this object is not set to autocommit then this will execute the commit
 	 */
 	public void commit();
+	
+	/**
+	 * Return the connection element for the give object
+	 * @return
+	 */
+	public Connection getConnection();
+
+	/**
+	 * Get the max number of seconds to allow for an update to run
+	 */
+	public int getUpdateTimeout();
+	
+	/**
+	 * Get the max number of seconds to allow for an append to run
+	 */
+	public int getAppendTimeout();
 }

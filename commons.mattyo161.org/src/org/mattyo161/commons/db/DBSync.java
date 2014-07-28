@@ -55,6 +55,7 @@ public class DBSync {
 	boolean typeMatching = false;
 	
 	private DBSyncLogger dbSyncLogger = null;
+	private DBSyncLog log = null;
 
 
 	public void synchronizeTable(DBSyncObject fromTable, DBSyncObject toTable) {
@@ -62,6 +63,14 @@ public class DBSync {
 	}
 
 	public void synchronizeTable(DBSyncObject fromTable, DBSyncObject toTable, boolean doAppends, boolean doDeletes, boolean doUpdates) {
+		synchronizeTable(fromTable, toTable, doAppends, doDeletes, doUpdates, false);
+	}
+		
+	protected DBSyncLog getLog() {
+		return this.log;
+	}
+	
+	public void synchronizeTable(DBSyncObject fromTable, DBSyncObject toTable, boolean doAppends, boolean doDeletes, boolean doUpdates, boolean updateChangesOnly) {
 		// TODO Auto-generated method stub
 
 		//reset counters:
@@ -71,8 +80,8 @@ public class DBSync {
 		if (toTable.getDescription() != null && !toTable.getDescription().equals("")) {
 			logName += " - " + toTable.getDescription();
 		}
-		DBSyncLog log = new DBSyncLog(logName);
-		this.getDbSyncLogger().add(log);
+		this.log = new DBSyncLog(logName);
+		this.getDbSyncLogger().add(this.log);
 		
 		appendRowCount = 0;
 		appendRowCountExecuted = 0;
@@ -81,6 +90,7 @@ public class DBSync {
 		updateRowCount = 0;
 		updateRowCountExecuted = 0;
 		processedRows = 0;
+		
 
 		// Let's create some working variables to make the code a little easier
 		// to read
@@ -98,6 +108,7 @@ public class DBSync {
 		PreparedStatement psToTableUpdate = null;
 		ResultSet rsToTable = null;
 		ResultSet rsFromTable = null;
+		DBSyncUpdater updater = null;
 
 		
 		try {
@@ -133,9 +144,15 @@ public class DBSync {
 			}
 			if (doAppends) {
 				psToTableAppend = toTable.getAppend();
+				if (toTable.getAppendTimeout() > 0) {
+					psToTableAppend.setQueryTimeout(toTable.getAppendTimeout());
+				}
 			}
 			if (doUpdates) {
 				psToTableUpdate = toTable.getUpdate();
+				if (toTable.getUpdateTimeout() > 0) {
+					psToTableUpdate.setQueryTimeout(toTable.getUpdateTimeout());
+				}
 			}
 
 
@@ -152,6 +169,10 @@ public class DBSync {
 			// defined we will not process it again.
 			ResultSetSchema rsSchema = new ResultSetSchema(rsToTable.getMetaData());
 			ResultSetSchema fromSchema = new ResultSetSchema(rsFromTable.getMetaData());
+			
+			if (updateChangesOnly) {
+				updater = new DBSyncUpdater(this, toTable, rsSchema);
+			}
 
 			// get the next rows, make sure to keep track of the returnValues as
 			// these are used to determine
@@ -159,7 +180,7 @@ public class DBSync {
 			boolean rsToTableNext = rsToTable.next();
 			boolean rsFromTableNext = rsFromTable.next();
 			while (rsToTableNext || rsFromTableNext) {
-				log.incrementProcessed();
+				this.log.incrementProcessed();
 				if (++processedRows % incrementalLog == 0) {
 					System.out.println("Processed " + processedRows + " rows after " + (new Cal().diff(startTime)/1000) + " secs.");
 				}
@@ -198,7 +219,7 @@ public class DBSync {
 								System.out.println(e);
 								e.printStackTrace();
 								// System.out.println("KeyFields: " + keyFields);
-								log.addError("ERROR Appending row (" + tableKey + ") couldn't set field '" + currField + "' to '" + fromObj + "'",e);
+								this.log.addError("ERROR Appending row (" + tableKey + ") couldn't set field '" + currField + "' to '" + fromObj + "'",e);
 								System.out.println(tableKey);
 								throw new SQLException("ERROR: Setting field '" + currField + "' to '" + fromObj + "' (" + e + ").");
 //								System.out.println("Setting field " + currField + " to \"\"");
@@ -265,7 +286,7 @@ public class DBSync {
 							System.out.println("Error comparing fields " +
 									fromTable.getKeyFields().get(j) + " (" + fromObj + ") -> " +
 									toTable.getKeyFields().get(j) + " (" + toObj + ")");
-							log.addError("Error comparing fields " +
+							this.log.addError("Error comparing fields " +
 									fromTable.getKeyFields().get(j) + " (" + fromObj + ") -> " +
 									toTable.getKeyFields().get(j) + " (" + toObj + ")", e);
 							e.printStackTrace();
@@ -294,10 +315,14 @@ public class DBSync {
 							try {
 								boolean recordsMatch = true;
 								boolean test = false;
+								boolean usesFieldNames = true;
 								// Create a HashMap to store the changed valued
-								HashMap recordChanges = new HashMap();
+								Map<String, List<Object>> recordChanges = new HashMap<String, List<Object>>();
 								for (int k = 0; k < toTable.getUpdateFields().size(); k++) {
 									currToField = toTable.getUpdateFields().get(k);
+									if (!String.class.isInstance(currToField)) {
+										usesFieldNames = false;
+									}
 									currFromField = fromTable.getUpdateFields().get(k);
 									Object toObj = getSqlValue(rsToTable, toTable.getUpdateFields().get(k));
 									Object fromObj = getSqlValue(rsFromTable, fromTable.getUpdateFields().get(k));
@@ -311,12 +336,12 @@ public class DBSync {
 										recordsMatch = false;
 										// store the changes in an array so they can
 										// be logged
-										ArrayList changes = new ArrayList();
+										ArrayList<Object> changes = new ArrayList<Object>();
 										changes.add(toObj);
 										changes.add(fromObj);
 
 										// log the change to the field for debugging
-										recordChanges.put(currToField, changes);
+										recordChanges.put(currToField.toString(), changes);
 									}
 								}
 								if (recordsMatch) {
@@ -325,32 +350,36 @@ public class DBSync {
 									}
 								} else {
 									// lets update or commit the changes
-
-									// first we need to update the new values from the fromTable
-									for (int x = 0; x < fromTable.getUpdateFields().size(); x++) {
-										if (isTypeMatching()) {
-											psToTableUpdate.setObject(x + 1, getSqlValue(rsFromTable, fromTable.getUpdateFields().get(x), rsSchema));
-										} else {
-											psToTableUpdate.setObject(x + 1, getSqlValue(rsFromTable, fromTable.getUpdateFields().get(x)));
+									if (updater != null && usesFieldNames) {
+										// We need to use the DBSyncUpdater for this, for faster updates
+										updater.addUpdate(recordChanges, rsFromTable);
+										updateRowCount++;
+									} else {
+										// first we need to update the new values from the fromTable
+										for (int x = 0; x < fromTable.getUpdateFields().size(); x++) {
+											if (isTypeMatching()) {
+												psToTableUpdate.setObject(x + 1, getSqlValue(rsFromTable, fromTable.getUpdateFields().get(x), rsSchema));
+											} else {
+												psToTableUpdate.setObject(x + 1, getSqlValue(rsFromTable, fromTable.getUpdateFields().get(x)));
+											}
 										}
-									}
-									// now we need to add the where fields but we have to start at the end of the updateFieldCount
-									int updateFieldCount = fromTable.getUpdateFields().size();
-									for (int x = 0; x < toTable.getKeyFields().size(); x++) {
-										if (isTypeMatching()) {
-											psToTableUpdate.setObject(updateFieldCount + x + 1, getSqlValue(rsToTable, toTable.getKeyFields().get(x), rsSchema));
-										} else {
-											psToTableUpdate.setObject(updateFieldCount + x + 1, getSqlValue(rsToTable, toTable.getKeyFields().get(x)));
+										// now we need to add the where fields but we have to start at the end of the updateFieldCount
+										int updateFieldCount = fromTable.getUpdateFields().size();
+										for (int x = 0; x < toTable.getKeyFields().size(); x++) {
+											if (isTypeMatching()) {
+												psToTableUpdate.setObject(updateFieldCount + x + 1, getSqlValue(rsToTable, toTable.getKeyFields().get(x), rsSchema));
+											} else {
+												psToTableUpdate.setObject(updateFieldCount + x + 1, getSqlValue(rsToTable, toTable.getKeyFields().get(x)));
+											}
 										}
-
-									}
-
-									updateRowCount++;
-									try {
-										psToTableUpdate.addBatch();
-									} catch (Exception e) {
-										log.addError("UPDATE Error", e);
-										System.out.println("UPDATE Error: " + e.toString());
+	
+										updateRowCount++;
+										try {
+											psToTableUpdate.addBatch();
+										} catch (Exception e) {
+											this.log.addError("UPDATE Error", e);
+											System.out.println("UPDATE Error: " + e.toString());
+										}
 									}
 									if (logUpdates) {
 										System.out.println("\t" + toTableName + " Records match keys " + temp.toString() + " Values Differ");
@@ -362,7 +391,7 @@ public class DBSync {
 									}
 								}
 							} catch (Exception e) {
-								log.addError("Key: (" + tableKey + "); AtField: FromField(" + currFromField + ") ToField(" + currToField + ")", e);
+								this.log.addError("Key: (" + tableKey + "); AtField: FromField(" + currFromField + ") ToField(" + currToField + ")", e);
 								System.out.println(tableKey);
 	//							System.out.println("KeyFields: " + keyFields);
 								System.out.println("AtField: FromField(" + currFromField + ") ToField(" + currToField + ")");
@@ -442,7 +471,7 @@ public class DBSync {
 									System.out.println(e);
 									// System.out.println("KeyFields: " +
 									// keyFields);
-									log.addError("Key (" + tableKey + ") Setting field " + currField + " to \"\"", e);
+									this.log.addError("Key (" + tableKey + ") Setting field " + currField + " to \"\"", e);
 									System.out.println(tableKey);
 									System.out.println("Setting field " + currField + " to \"\"");
 									psToTableAppend.setString(j + 1, "");
@@ -476,7 +505,7 @@ public class DBSync {
 				// have conflicts
 				if (deleteRowCount % incrementalDelete == 0 && deleteRowCount > deleteRowCountExecuted) { // && !rsToTableNext) {
 					// We need to execute the batch
-					log.startDelete();
+					this.log.startDelete();
 					System.out.print(deleteRowCount + " deletes have accumulated, executing delete after " + (new Cal().diff(startTime) / 1000) + " secs.");
 					Cal sqlStartTime = new Cal();
 					try {
@@ -495,11 +524,11 @@ public class DBSync {
 								failedUpdates++;
 							}
 						}
-						log.incrementDeletes(successfulUpdates);
-						log.incrementFailedDeletes(failedUpdates);
+						this.log.incrementDeletes(successfulUpdates);
+						this.log.incrementFailedDeletes(failedUpdates);
 						System.out.println(" (" + successfulUpdates + " Deletes Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
 					} catch (SQLException e) {
-						log.addError("Failure to delete records", e);
+						this.log.addError("Failure to delete records", e);
 						System.out.println("\nFailure to delete records. " + e.toString());
 						e.printStackTrace();
 						SQLException nextE = e.getNextException();
@@ -509,40 +538,44 @@ public class DBSync {
 							nextE = nextE.getNextException();
 						}
 					} catch (Exception e) {
-						log.addError("Failure to delete records", e);
+						this.log.addError("Failure to delete records", e);
 						System.out.println("\nFailure to delete records.");
 						e.printStackTrace();
 					}
-					log.doneDelete();
+					this.log.doneDelete();
 					psToTableDelete.clearParameters();
 					deleteRowCountExecuted = deleteRowCount;
 				}
 				if (updateRowCount % incrementalUpdate == 0 && updateRowCount > updateRowCountExecuted) { // && !rsToTableNext) {
 					// We need to execute the batch
-					log.startUpdate();
+					this.log.startUpdate();
 					System.out.print(updateRowCount + " updates have accumulated, executing update after " + (new Cal().diff(startTime) / 1000) + " secs.");
 					Cal sqlStartTime = new Cal();
 					try {
-						int[] updateReturn = psToTableUpdate.executeBatch();
-						if (!toTable.getAutoCommit() && !isCommitAtEnd()) {
-							System.out.print(" Commiting changes ");
-							toTable.commit();
-						}
-						int successfulUpdates = 0;
-						int failedUpdates = 0;
-						for (int y = 0; y < updateReturn.length; y++) {
-							int currentResult = updateReturn[y];
-							if (currentResult != Statement.EXECUTE_FAILED) {
-								successfulUpdates += currentResult;
-							} else {
-								failedUpdates++;
+						if (updater != null) {
+							updater.execute();
+						} else {
+							int[] updateReturn = psToTableUpdate.executeBatch();
+							if (!toTable.getAutoCommit() && !isCommitAtEnd()) {
+								System.out.print(" Commiting changes ");
+								toTable.commit();
 							}
+							int successfulUpdates = 0;
+							int failedUpdates = 0;
+							for (int y = 0; y < updateReturn.length; y++) {
+								int currentResult = updateReturn[y];
+								if (currentResult != Statement.EXECUTE_FAILED) {
+									successfulUpdates += currentResult;
+								} else {
+									failedUpdates++;
+								}
+							}
+							this.log.incrementUpdates(successfulUpdates);
+							this.log.incrementFailedUpdates(failedUpdates);
+							System.out.println(" (" + successfulUpdates + " Updates Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
 						}
-						log.incrementUpdates(successfulUpdates);
-						log.incrementFailedUpdates(failedUpdates);
-						System.out.println(" (" + successfulUpdates + " Updates Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
 					} catch (SQLException e) {
-						log.addError("Failure to update records", e);
+						this.log.addError("Failure to update records", e);
 						System.out.println("\nFailure to update records. " + e.toString());
 						e.printStackTrace();
 						SQLException nextE = e.getNextException();
@@ -552,11 +585,11 @@ public class DBSync {
 							nextE = nextE.getNextException();
 						}
 					} catch (Exception e) {
-						log.addError("Failure to update records", e);
+						this.log.addError("Failure to update records", e);
 						System.out.println("\nFailure to update records.");
 						e.printStackTrace();
 					}
-					log.doneUpdate();
+					this.log.doneUpdate();
 					updateRowCountExecuted = updateRowCount;
 					psToTableUpdate.clearParameters();
 				}
@@ -565,7 +598,7 @@ public class DBSync {
 					// performed
 					if (deleteRowCount > deleteRowCountExecuted) {
 						// We need to execute the batch
-						log.startDelete();
+						this.log.startDelete();
 						System.out.print(deleteRowCount + " deletes have accumulated, executing delete before append.");
 						Cal sqlStartTime = new Cal();
 						try {
@@ -584,11 +617,11 @@ public class DBSync {
 									failedUpdates++;
 								}
 							}
-							log.incrementDeletes(successfulUpdates);
-							log.incrementFailedDeletes(failedUpdates);
+							this.log.incrementDeletes(successfulUpdates);
+							this.log.incrementFailedDeletes(failedUpdates);
 							System.out.println(" (" + successfulUpdates + " Deletes Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
 						} catch (SQLException e) {
-							log.addError("Failure to delete records", e);
+							this.log.addError("Failure to delete records", e);
 							System.out.println("\nFailure to delete records. " + e.toString());
 							e.printStackTrace();
 							SQLException nextE = e.getNextException();
@@ -598,16 +631,16 @@ public class DBSync {
 								nextE = nextE.getNextException();
 							}
 						} catch (Exception e) {
-							log.addError("Failure to delete records", e);
+							this.log.addError("Failure to delete records", e);
 							System.out.println("\nFailure to delete records.");
 							e.printStackTrace();
 						}
-						log.doneDelete();
+						this.log.doneDelete();
 						psToTableDelete.clearParameters();
 						deleteRowCountExecuted = deleteRowCount;
 					}
 					// We need to execute the batch
-					log.startAppend();
+					this.log.startAppend();
 					System.out.print(appendRowCount + " appends have accumulated, executing insert after " + (new Cal().diff(startTime) / 1000) + " secs.");
 					Cal sqlStartTime = new Cal();
 					try {
@@ -626,11 +659,11 @@ public class DBSync {
 								failedUpdates++;
 							}
 						}
-						log.incrementAppends(successfulUpdates);
-						log.incrementFailedAppends(failedUpdates);
+						this.log.incrementAppends(successfulUpdates);
+						this.log.incrementFailedAppends(failedUpdates);
 						System.out.println(" (" + successfulUpdates + " Appends Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
 					} catch (SQLException e) {
-						log.addError("Failure to append records", e);
+						this.log.addError("Failure to append records", e);
 						System.out.println("\nFailure to append records. " + e.toString());
 						e.printStackTrace();
 						SQLException nextE = e.getNextException();
@@ -640,47 +673,47 @@ public class DBSync {
 							nextE = nextE.getNextException();
 						}
 					} catch (Exception e) {
-						log.addError("Failure to append records", e);
+						this.log.addError("Failure to append records", e);
 						System.out.println("Failure to append records.");
 						e.printStackTrace();
 					}
-					log.doneAppend();
+					this.log.doneAppend();
 					psToTableAppend.clearParameters();
 					appendRowCountExecuted = appendRowCount;
 				}
 			}
-			rsToTable.close();
-			rsFromTable.close();
-
-			psToTable.close();
-			psFromTable.close();
+			
 			System.out.println("Processed " + processedRows + " rows in " + (new Cal().diff(startTime)) + " ms.");
 
 			if (updateRowCount > 0) {
-				log.startUpdate();
+				this.log.startUpdate();
 				System.out.print(updateRowCount + " updates have accumulated, executing update after " + (new Cal().diff(startTime) / 1000) + " secs.");
 				Cal sqlStartTime = new Cal();
 				try {
-					int[] updateReturn = psToTableUpdate.executeBatch();
-					if (!toTable.getAutoCommit() && !isCommitAtEnd()) {
-						System.out.print(" Commiting changes ");
-						toTable.commit();
-					}
-					int successfulUpdates = 0;
-					int failedUpdates = 0;
-					for (int y = 0; y < updateReturn.length; y++) {
-						int currentResult = updateReturn[y];
-						if (currentResult != Statement.EXECUTE_FAILED) {
-							successfulUpdates += currentResult;
-						} else {
-							failedUpdates++;
+					if (updater != null) {
+						updater.execute();
+					} else {
+						int[] updateReturn = psToTableUpdate.executeBatch();
+						if (!toTable.getAutoCommit() && !isCommitAtEnd()) {
+							System.out.print(" Commiting changes ");
+							toTable.commit();
 						}
+						int successfulUpdates = 0;
+						int failedUpdates = 0;
+						for (int y = 0; y < updateReturn.length; y++) {
+							int currentResult = updateReturn[y];
+							if (currentResult != Statement.EXECUTE_FAILED) {
+								successfulUpdates += currentResult;
+							} else {
+								failedUpdates++;
+							}
+						}
+						this.log.incrementUpdates(successfulUpdates);
+						this.log.incrementFailedUpdates(failedUpdates);
+						System.out.println(" (" + successfulUpdates + " Updates Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
 					}
-					log.incrementUpdates(successfulUpdates);
-					log.incrementFailedUpdates(failedUpdates);
-					System.out.println(" (" + successfulUpdates + " Updates Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
 				} catch (SQLException e) {
-					log.addError("Failure to update records", e);
+					this.log.addError("Failure to update records", e);
 					System.out.println("\nFailure to update records. " + e.toString());
 					e.printStackTrace();
 					SQLException nextE = e.getNextException();
@@ -690,17 +723,14 @@ public class DBSync {
 						nextE = nextE.getNextException();
 					}
 				} catch (Exception e) {
-					log.addError("Failure to update records", e);
+					this.log.addError("Failure to update records", e);
 					System.out.println("\nFailure to update records.");
 					e.printStackTrace();
 				}
-				log.doneUpdate();
-			}
-			if (psToTableUpdate != null) { 
-				psToTableUpdate.close();
+				this.log.doneUpdate();
 			}
 			if (deleteRowCount > 0) {
-				log.startDelete();
+				this.log.startDelete();
 				System.out.print(deleteRowCount + " deletes have accumulated, executing delete after " + (new Cal().diff(startTime) / 1000) + " secs.");
 				Cal sqlStartTime = new Cal();
 				try {
@@ -719,11 +749,11 @@ public class DBSync {
 							failedUpdates++;
 						}
 					}
-					log.incrementDeletes(successfulUpdates);
-					log.incrementFailedDeletes(failedUpdates);
+					this.log.incrementDeletes(successfulUpdates);
+					this.log.incrementFailedDeletes(failedUpdates);
 					System.out.println(" (" + successfulUpdates + " Deletes Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
 				} catch (SQLException e) {
-					log.addError("Failure to delete records", e);
+					this.log.addError("Failure to delete records", e);
 					System.out.println("\nFailure to delete records. " + e.toString());
 					e.printStackTrace();
 					SQLException nextE = e.getNextException();
@@ -733,17 +763,17 @@ public class DBSync {
 						nextE = nextE.getNextException();
 					}
 				} catch (Exception e) {
-					log.addError("Failure to delete records", e);
+					this.log.addError("Failure to delete records", e);
 					System.out.println("Failure to delete records.");
 					e.printStackTrace();
 				}
-				log.doneDelete();
+				this.log.doneDelete();
 			}
 			if (psToTableDelete != null) { 
 				psToTableDelete.close();
 			}
 			if (appendRowCount > 0) {
-				log.startAppend();
+				this.log.startAppend();
 				System.out.print(appendRowCount + " appends have accumulated, executing insert after " + (new Cal().diff(startTime) / 1000) + " secs.");
 				Cal sqlStartTime = new Cal();
 				try {
@@ -762,11 +792,11 @@ public class DBSync {
 							failedUpdates++;
 						}
 					}
-					log.incrementAppends(successfulUpdates);
-					log.incrementFailedAppends(failedUpdates);
+					this.log.incrementAppends(successfulUpdates);
+					this.log.incrementFailedAppends(failedUpdates);
 					System.out.println(" (" + successfulUpdates + " Appends Succeeded " + failedUpdates + " failed) in " + new Cal().diff(sqlStartTime) + " ms.");
 				} catch (SQLException e) {
-					log.addError("Failure to append records", e);
+					this.log.addError("Failure to append records", e);
 					System.out.println("\nFailure to append records. " + e.toString());
 					e.printStackTrace();
 					SQLException nextE = e.getNextException();
@@ -776,14 +806,11 @@ public class DBSync {
 						nextE = nextE.getNextException();
 					}
 				} catch (Exception e) {
-					log.addError("Failure to append records", e);
+					this.log.addError("Failure to append records", e);
 					System.out.println("\nFailure to append records.");
 					e.printStackTrace();
 				}
-				log.doneAppend();
-			}
-			if (psToTableAppend != null) { 
-				psToTableAppend.close();
+				this.log.doneAppend();
 			}
 
 			if (!toTable.getAutoCommit() && isCommitAtEnd()) {
@@ -795,42 +822,21 @@ public class DBSync {
 			System.out.println("Done synching table '" + fromTableName + "' " +
 					"to '" + toTableName + "' at " + new Cal() + " in " + (new Cal().diff(startTime)/1000) + " secs");
 		} catch (Exception e) {
-			log.addError("Error in main DBSync clause", e);
+			this.log.addError("Error in main DBSync clause", e);
 			System.out.println("Error in main DBSync try clause:");
 			e.printStackTrace();
 		} finally {
-			if (rsFromTable != null) {
-				try { rsFromTable.close(); } catch (Exception e ) {}
-				rsFromTable = null;
-			}
-			if (rsToTable != null) {
-				try { rsToTable.close(); } catch (Exception e ) {}
-				rsToTable = null;
-			}
-			if (psToTable != null) {
-				try { psToTable.close(); } catch (Exception e ) {}
-				psToTable = null;
-			}
-			if (psFromTable != null) {
-				try { psFromTable.close(); } catch (Exception e ) {}
-				psFromTable = null;
-			}
-			if (psToTableAppend != null) {
-				try { psToTableAppend.close(); } catch (Exception e ) {}
-				psToTableAppend = null;
-			}
-			if (psToTableDelete != null) {
-				try { psToTableDelete.close(); } catch (Exception e ) {}
-				psToTableDelete = null;
-			}
-			if (psToTableUpdate != null) {
-				try { psToTableUpdate.close(); } catch (Exception e ) {}
-				psToTableUpdate = null;
-			}
+			DBConnection.closeSQLObject(rsFromTable);
+			DBConnection.closeSQLObject(rsToTable);
+			DBConnection.closeSQLObject(psToTable);
+			DBConnection.closeSQLObject(psToTableAppend);
+			DBConnection.closeSQLObject(psToTableDelete);
+			DBConnection.closeSQLObject(psToTableUpdate);
+			DBConnection.closeSQLObject(updater);
 		}
 		System.gc();
-		log.done();
-		System.out.println(log.toString());
+		this.log.done();
+		System.out.println(this.log.toString());
 	}
 
 	/**
@@ -842,7 +848,7 @@ public class DBSync {
 	 * @return
 	 * @throws SQLException
 	 */
-	private static Object getSqlValue(ResultSet rs, Object currField, ResultSetSchema schema) throws SQLException {
+	protected static Object getSqlValue(ResultSet rs, Object currField, ResultSetSchema schema) throws SQLException {
 		// first get the object the regular way
 		Object theObj = getSqlValue(rs, currField);
 		// now we will add some checks based on if the schema and theObj do not match up
@@ -859,7 +865,7 @@ public class DBSync {
 		return theObj;
 	}
 	
-	private static Object getSqlValue(ResultSet rs, Object currField) throws SQLException {
+	protected static Object getSqlValue(ResultSet rs, Object currField) throws SQLException {
 		Object theObj = null;
 		if (Integer.class.isInstance(currField)) {
 			theObj = rs.getObject(((Integer) currField).intValue());

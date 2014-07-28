@@ -750,6 +750,8 @@ public class DBConnection implements Connection {
 					((Connection) obj).close();
 				} else if (PreparedStatement.class.isInstance(obj)) {
 					((PreparedStatement) obj).close();
+				} else if (DBSyncUpdater.class.isInstance(obj)) {
+					((DBSyncUpdater) obj).close();
 				}
 			} catch (SQLException e) {
 				printSQLStackTrace(e);
