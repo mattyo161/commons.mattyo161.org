@@ -6,6 +6,7 @@ package org.mattyo161.commons.db;
  * Created on April 13, 2004, 12:21 PM
  */
 import java.sql.*;
+import java.sql.Date;
 
 import org.mattyo161.commons.cal.*;
 import org.mattyo161.commons.db.schema.Column;
@@ -952,6 +953,10 @@ public class DBSync {
 				} catch (IOException e ) {
 					// swallow the exception for now.
 				}
+			} else if (Timestamp.class.isInstance(fromObj)) {
+				test = ((String) toObj).replaceAll("\\s+$", "").equalsIgnoreCase((new Cal(fromObj).toString()).replaceAll("\\s+$", ""));
+			} else if (Date.class.isInstance(fromObj)) {
+				test = ((String) toObj).replaceAll("\\s+$", "").equalsIgnoreCase((new Cal(fromObj).format("yyyy-mm-dd")).replaceAll("\\s+$", ""));
 			} else {
 				test = ((String) toObj).replaceAll("\\s+$", "").equalsIgnoreCase(((String) fromObj).replaceAll("\\s+$", ""));
 			}
