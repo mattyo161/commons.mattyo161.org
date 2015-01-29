@@ -735,6 +735,27 @@ public class DBConnection implements Connection {
 		}
 	}
 	
+	public static String toStringStackTrace(Exception e) {
+		StringBuffer traceString = new StringBuffer();
+		traceString.append(e.toString()).append("\n");
+		StackTraceElement[] trace = e.getStackTrace();
+		for (int i = 0; i < trace.length; i++) {
+			traceString.append("\t").append(trace[i].toString()).append("\n");
+		}
+		return traceString.toString();
+	}
+	
+	public static String toStringSQLStackTrace(SQLException e) {
+		StringBuffer traceString = new StringBuffer();
+		traceString.append(toStringStackTrace(e));
+		SQLException nextException = e.getNextException();
+		while (nextException != null) {
+			traceString.append(toStringStackTrace(nextException));
+			nextException = nextException.getNextException();
+		}
+		return traceString.toString();
+	}
+	
 	/**
 	 * A quick and simple wrapper method to close ResultSet, Connection, Statements, etc. cleanly in a finally clause
 	 * @param obj
