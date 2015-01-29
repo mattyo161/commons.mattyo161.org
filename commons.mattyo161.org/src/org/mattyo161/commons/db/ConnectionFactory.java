@@ -5,6 +5,8 @@ import java.text.*;
 import java.util.*;
 import java.lang.*;
 import java.sql.*;
+
+import org.apache.commons.lang.StringUtils;
 import org.mattyo161.commons.util.MyEnvironment;
 
 /**
@@ -382,6 +384,10 @@ public class ConnectionFactory {
             }
             pos = server.indexOf("@");
             if (pos > 0) {
+            	// make sure we get the right most @ symbol
+            	while (server.indexOf("@",pos + 1) > 0) {
+            		pos = server.indexOf("@",pos + 1);
+            	}
                 user = server.substring(0, pos);
                 if (pos < server.length()) {
                     server = server.substring(pos + 1);
