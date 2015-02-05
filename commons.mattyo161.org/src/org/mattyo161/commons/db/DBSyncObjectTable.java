@@ -17,19 +17,38 @@ import org.mattyo161.commons.db.schema.TableSchema;
 
 public class DBSyncObjectTable extends DBSyncObjectQueries {
 	private TableSchema tableSchema = null;
+	private boolean requirePrimaryKey;
+	private List<String> ignoreFields;
 	
 	public DBSyncObjectTable(Connection conn, String tableName) throws SQLException {
 		super(tableName, conn);
-		init(conn, tableName, true);
+		this.requirePrimaryKey = true;
+		this.ignoreFields = new Vector();
+		init();
 	}
 	public DBSyncObjectTable(Connection conn, String tableName, String description) throws SQLException {
 		super(tableName, conn);
-		init(conn, tableName, true);
+		this.requirePrimaryKey = true;
+		this.ignoreFields = new Vector();
+		init();
 		setDescription(description);
 	}
 	public DBSyncObjectTable(Connection conn, String tableName, boolean requirePrimaryKey) throws SQLException {
 		super(tableName, conn);
-		init(conn, tableName, requirePrimaryKey);
+		this.requirePrimaryKey = requirePrimaryKey;
+		this.ignoreFields = new Vector();
+		init();
+	}
+
+	public void init() throws SQLException {
+		init(this.getConnection(), this.getName(), this.requirePrimaryKey);
+	}
+	
+	public void ignoreFields(String[] fieldNames) throws SQLException {
+		for (int i = 0; i < fieldNames.length; i++) {
+			this.ignoreFields.add(fieldNames[i].toLowerCase());
+		}
+		init();
 	}
 	
 	public void init(Connection conn, String tableName, boolean requirePrimaryKey) throws SQLException {
@@ -43,7 +62,9 @@ public class DBSyncObjectTable extends DBSyncObjectQueries {
 		
 		for (Iterator i = cols.iterator(); i.hasNext(); ) {
 			Column currCol = (Column) i.next();
-			appendFields.add(currCol.getName().toLowerCase());
+			if (!this.ignoreFields.contains(currCol.getName().toLowerCase())) {
+				appendFields.add(currCol.getName().toLowerCase());
+			}
 		}
 		// now we define the keyFields from the the primary key
 		Index pk = tableSchema.getPrimaryKey();
@@ -122,8 +143,8 @@ public class DBSyncObjectTable extends DBSyncObjectQueries {
 				e.printStackTrace();
 			}
 		}
-		
 	}
+	
 	public TableSchema getTableSchema() {
 		return tableSchema;
 	}

@@ -397,7 +397,7 @@ public class DBSyncObjectQueries implements DBSyncObject {
 	public Connection getConnection() {
 		return this.conn;
 	}
-
+	
 	public void setUpdateTimeout(int updateTimeout) {
 		this.updateTimeout = updateTimeout;
 	}
